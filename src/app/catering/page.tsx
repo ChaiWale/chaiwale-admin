@@ -122,15 +122,25 @@ export default function AdminCateringPage() {
 
   const filteredLeads = leads.filter(lead => {
     const matchesStatus = statusFilter === 'ALL' || lead.status === statusFilter;
-    const query = searchQuery.toLowerCase().trim();
-    const matchesSearch =
-      !query ||
-      lead.leadNumber.toLowerCase().includes(query) ||
-      lead.customerName.toLowerCase().includes(query) ||
-      lead.phone.includes(query) ||
-      (lead.companyName && lead.companyName.toLowerCase().includes(query)) ||
-      lead.serviceType.toLowerCase().includes(query);
-    return matchesStatus && matchesSearch;
+    if (!matchesStatus) return false;
+
+    const rawQuery = searchQuery.toLowerCase().trim();
+    const keywords = rawQuery ? rawQuery.split(/\s+/).filter(Boolean) : [];
+    if (keywords.length === 0) return true;
+
+    const searchable = [
+      lead.leadNumber,
+      lead.customerName || '',
+      lead.phone || '',
+      lead.email || '',
+      lead.companyName || '',
+      lead.serviceType || '',
+      lead.requirements || '',
+      lead.status || '',
+      lead.headcount?.toString() || ''
+    ].join(' ').toLowerCase();
+
+    return keywords.every(kw => searchable.includes(kw));
   });
 
   return (
@@ -216,7 +226,7 @@ export default function AdminCateringPage() {
         {/* Search input */}
         <input
           type="text"
-          placeholder="Search by Lead #, Name, Company..."
+          placeholder="Search leads by #, name, company, phone, event type, or keywords..."
           value={searchQuery}
           onChange={e => setSearchQuery(e.target.value)}
           style={{

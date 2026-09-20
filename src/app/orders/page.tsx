@@ -101,13 +101,26 @@ export default function AdminOrdersPage() {
 
   const filteredOrders = orders.filter(order => {
     const matchesStatus = statusFilter === 'ALL' || order.status === statusFilter;
-    const query = searchQuery.toLowerCase().trim();
-    const matchesSearch =
-      !query ||
-      order.order_number.toLowerCase().includes(query) ||
-      (order.customer_name && order.customer_name.toLowerCase().includes(query)) ||
-      (order.delivery_address && order.delivery_address.toLowerCase().includes(query));
-    return matchesStatus && matchesSearch;
+    if (!matchesStatus) return false;
+
+    const rawQuery = searchQuery.toLowerCase().trim();
+    const keywords = rawQuery ? rawQuery.split(/\s+/).filter(Boolean) : [];
+    if (keywords.length === 0) return true;
+
+    const itemsText = (order.items || []).map((i: any) => i.item_name || i.name || '').join(' ');
+    const searchable = [
+      order.order_number,
+      order.customer_name || '',
+      order.delivery_address || '',
+      order.status || '',
+      order.order_type || '',
+      order.payment_mode || '',
+      order.transaction_ref || '',
+      order.grand_total?.toString() || '',
+      itemsText
+    ].join(' ').toLowerCase();
+
+    return keywords.every(kw => searchable.includes(kw));
   });
 
   return (
@@ -195,7 +208,7 @@ export default function AdminOrdersPage() {
         {/* Search input */}
         <input
           type="text"
-          placeholder="Search by Order # or Customer..."
+          placeholder="Search orders by #, customer, phone, address, items, status, or keywords..."
           value={searchQuery}
           onChange={e => setSearchQuery(e.target.value)}
           style={{

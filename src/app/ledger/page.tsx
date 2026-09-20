@@ -8,6 +8,7 @@ export default function AdminLedgerPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [typeFilter, setTypeFilter] = useState<'ALL' | 'DEBIT' | 'CREDIT'>('ALL');
+  const [searchQuery, setSearchQuery] = useState('');
 
   const loadLedger = async () => {
     setLoading(true);
@@ -27,8 +28,20 @@ export default function AdminLedgerPage() {
   }, []);
 
   const filteredEntries = entries.filter(e => {
-    if (typeFilter === 'ALL') return true;
-    return e.entry_type === typeFilter;
+    if (typeFilter !== 'ALL' && e.entry_type !== typeFilter) return false;
+    const rawQuery = searchQuery.toLowerCase().trim();
+    const keywords = rawQuery ? rawQuery.split(/\s+/).filter(Boolean) : [];
+    if (keywords.length === 0) return true;
+
+    const searchable = [
+      e.reference_note || '',
+      e.corporate_clients?.company_name || '',
+      e.invoices?.invoice_number || '',
+      e.entry_type || '',
+      e.amount?.toString() || ''
+    ].join(' ').toLowerCase();
+
+    return keywords.every(kw => searchable.includes(kw));
   });
 
   const totalDebits = entries.filter(e => e.entry_type === 'DEBIT').reduce((a, c) => a + Number(c.amount), 0);
@@ -107,26 +120,42 @@ export default function AdminLedgerPage() {
         </div>
       </div>
 
-      {/* Filter Tabs */}
-      <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
-        {(['ALL', 'DEBIT', 'CREDIT'] as const).map(t => (
-          <button
-            key={t}
-            onClick={() => setTypeFilter(t)}
-            style={{
-              padding: '6px 16px',
-              borderRadius: '20px',
-              fontSize: '12px',
-              fontWeight: 600,
-              cursor: 'pointer',
-              border: 'none',
-              backgroundColor: typeFilter === t ? 'var(--cw-color-primary)' : '#FFFFFF',
-              color: typeFilter === t ? '#FFFFFF' : '#64748B'
-            }}
-          >
-            {t === 'ALL' ? 'All Ledger Entries' : t === 'DEBIT' ? 'Debits (+ Due)' : 'Credits (Settled)'}
-          </button>
-        ))}
+      {/* Search & Filter Toolbar */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
+        <div style={{ display: 'flex', gap: '8px' }}>
+          {(['ALL', 'DEBIT', 'CREDIT'] as const).map(t => (
+            <button
+              key={t}
+              onClick={() => setTypeFilter(t)}
+              style={{
+                padding: '6px 16px',
+                borderRadius: '20px',
+                fontSize: '12px',
+                fontWeight: 600,
+                cursor: 'pointer',
+                border: 'none',
+                backgroundColor: typeFilter === t ? 'var(--cw-color-primary)' : '#FFFFFF',
+                color: typeFilter === t ? '#FFFFFF' : '#64748B'
+              }}
+            >
+              {t === 'ALL' ? 'All Ledger Entries' : t === 'DEBIT' ? 'Debits (+ Due)' : 'Credits (Settled)'}
+            </button>
+          ))}
+        </div>
+
+        <input
+          type="text"
+          placeholder="Search ledger by description, account, reference, or keywords..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          style={{
+            padding: '8px 14px',
+            border: '1px solid var(--cw-color-border)',
+            borderRadius: 'var(--cw-radius-md)',
+            fontSize: '13px',
+            minWidth: '280px'
+          }}
+        />
       </div>
 
       {/* Ledger Table */}

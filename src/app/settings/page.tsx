@@ -20,14 +20,14 @@ interface StoreSettingsState {
 const DEFAULT_SETTINGS: StoreSettingsState = {
   storeName: 'Chaiwale',
   tagline: 'Sip, Bite, Repeat • Authentic Chai & Handcrafted Indian Snacks',
-  address: 'Shop No. 1, Ground Floor, Best Sky Tower, Netaji Subhash Place (NSP), Pitampura, New Delhi, Delhi 110034',
+  address: 'G-31, Vardhman Grand Plaza, Mangalam Place, M2K Road, Rohini Sector-3, New Delhi – 110085',
   phone: '+91 93101 12564',
   whatsapp: '919310112564',
   email: 'support@chaiwale.co.in',
   openingTime: '08:00 AM',
-  closingTime: '11:00 PM',
+  closingTime: '06:00 PM',
   isOpen: true,
-  upiId: 'paytmqr28100505010115gsv3315o55@paytm',
+  upiId: 'chaiwale@ptyes',
   taxMode: 'Zero-Tax Direct Pricing (0% GST - Disabled)',
   currency: 'INR (₹)'
 };

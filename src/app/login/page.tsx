@@ -85,9 +85,9 @@ export default function AdminLoginPage() {
             boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
           }}
         />
-        <h1 style={{ fontSize: '22px', fontWeight: 800, color: '#1E2328', margin: 0, letterSpacing: '0.04em' }}>CHAIWALE</h1>
+        <h1 style={{ fontSize: '24px', fontWeight: 800, color: '#1E2328', margin: 0, letterSpacing: '0.04em' }}>Admin</h1>
         <p style={{ fontSize: '13px', color: '#64748B', marginTop: '4px', marginBottom: 0 }}>
-          Operational Management &amp; Staff Portal
+          Operations &amp; Staff Portal
         </p>
       </div>
 
@@ -146,7 +146,7 @@ export default function AdminLoginPage() {
               id="email"
               type="email"
               required
-              placeholder="e.g. admin@chaiwale.co.in"
+              placeholder="e.g. staff.auth@desk-portal.net"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               style={{

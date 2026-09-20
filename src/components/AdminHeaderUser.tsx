@@ -41,7 +41,9 @@ export default function AdminHeaderUser() {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
       <div style={{ textAlign: 'right' }}>
-        <div style={{ fontSize: '13px', fontWeight: 700, color: '#1E2328' }}>{user.fullName || user.email}</div>
+        <div style={{ fontSize: '13px', fontWeight: 700, color: '#1E2328' }}>
+          {user.fullName || (user.role === 'admin' ? 'Operations Admin' : 'Store Manager')}
+        </div>
         <span
           style={{
             fontSize: '10px',

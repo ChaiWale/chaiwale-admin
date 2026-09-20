@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   fetchAdminMenuItems,
   toggleItemAvailability,
@@ -8,9 +8,22 @@ import {
   updateAdminMenuItem,
   createAdminCategory,
   fetchCategories,
+  uploadMenuImage,
+  resolveMediaUrl,
   AdminMenuItemDto,
-  CategoryDto
+  CategoryDto,
+  MenuItemVariantDto
 } from '../../services/admin-api.client';
+import { compressAndConvertToWebP, formatBytes } from '../../utils/image-compressor';
+
+const POPULAR_TAG_OPTIONS = [
+  'Bestseller ⭐',
+  'Chef\'s Special 👨‍🍳',
+  'Must Try 🔥',
+  'Signature Dish 👑',
+  'Jain Available 🌿',
+  'Kid Friendly 👶'
+];
 
 export default function AdminMenuPage() {
   const [items, setItems] = useState<AdminMenuItemDto[]>([]);
@@ -35,8 +48,15 @@ export default function AdminMenuPage() {
   const [addName, setAddName] = useState('');
   const [addCategoryId, setAddCategoryId] = useState('');
   const [addPrice, setAddPrice] = useState('');
-  const [addIsVeg, setAddIsVeg] = useState(true);
+  const [addDietary, setAddDietary] = useState<'VEG' | 'NON_VEG' | 'EGG'>('VEG');
+  const [addSpiceLevel, setAddSpiceLevel] = useState<'NONE' | 'MILD' | 'MEDIUM' | 'HOT'>('NONE');
+  const [addTags, setAddTags] = useState<string[]>([]);
   const [addDescription, setAddDescription] = useState('');
+  const [addImagePath, setAddImagePath] = useState<string | null>(null);
+  const [addImagePreview, setAddImagePreview] = useState<string | null>(null);
+  const [addImageUploading, setAddImageUploading] = useState(false);
+  const [addImageStats, setAddImageStats] = useState<{ orig: number; comp: number; savings: number } | null>(null);
+  const [addVariants, setAddVariants] = useState<Array<{ name: string; price: string }>>([]);
   const [addSaving, setAddSaving] = useState(false);
   const [addError, setAddError] = useState<string | null>(null);
 
@@ -46,10 +66,20 @@ export default function AdminMenuPage() {
   const [editName, setEditName] = useState('');
   const [editCategoryId, setEditCategoryId] = useState('');
   const [editPrice, setEditPrice] = useState('');
-  const [editIsVeg, setEditIsVeg] = useState(true);
+  const [editDietary, setEditDietary] = useState<'VEG' | 'NON_VEG' | 'EGG'>('VEG');
+  const [editSpiceLevel, setEditSpiceLevel] = useState<'NONE' | 'MILD' | 'MEDIUM' | 'HOT'>('NONE');
+  const [editTags, setEditTags] = useState<string[]>([]);
   const [editDescription, setEditDescription] = useState('');
+  const [editImagePath, setEditImagePath] = useState<string | null>(null);
+  const [editImagePreview, setEditImagePreview] = useState<string | null>(null);
+  const [editImageUploading, setEditImageUploading] = useState(false);
+  const [editImageStats, setEditImageStats] = useState<{ orig: number; comp: number; savings: number } | null>(null);
+  const [editVariants, setEditVariants] = useState<Array<{ id?: string; name: string; price: string }>>([]);
   const [editSaving, setEditSaving] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
+
+  const addFileInputRef = useRef<HTMLInputElement | null>(null);
+  const editFileInputRef = useRef<HTMLInputElement | null>(null);
 
   const loadMenu = async () => {
     setLoading(true);
@@ -91,13 +121,77 @@ export default function AdminMenuPage() {
     }
   };
 
+  const handleImageFileChange = async (file: File, isEdit: boolean) => {
+    try {
+      if (isEdit) setEditImageUploading(true);
+      else setAddImageUploading(true);
+
+      // 1. Client-side automatic WebP conversion & compression
+      const compressed = await compressAndConvertToWebP(file, { maxWidth: 1000, maxHeight: 1000, quality: 0.82 });
+
+      const stats = {
+        orig: compressed.originalSize,
+        comp: compressed.compressedSize,
+        savings: compressed.reductionPercentage
+      };
+
+      if (isEdit) {
+        setEditImagePreview(compressed.base64);
+        setEditImageStats(stats);
+      } else {
+        setAddImagePreview(compressed.base64);
+        setAddImageStats(stats);
+      }
+
+      // 2. Upload to Supabase Storage 'menu' bucket
+      const targetCatId = isEdit ? editCategoryId : addCategoryId;
+      const catSlug = categories.find(c => c.id === targetCatId)?.slug || 'items';
+      const uploadRes = await uploadMenuImage(compressed.base64, compressed.fileName, catSlug);
+
+      if (isEdit) {
+        setEditImagePath(uploadRes.imagePath);
+      } else {
+        setAddImagePath(uploadRes.imagePath);
+      }
+    } catch (err: any) {
+      alert(`Image WebP processing failed: ${err.message}`);
+    } finally {
+      if (isEdit) setEditImageUploading(false);
+      else setAddImageUploading(false);
+    }
+  };
+
+  const resetAddForm = () => {
+    setAddName('');
+    setAddPrice('');
+    setAddDietary('VEG');
+    setAddSpiceLevel('NONE');
+    setAddTags([]);
+    setAddDescription('');
+    setAddImagePath(null);
+    setAddImagePreview(null);
+    setAddImageStats(null);
+    setAddVariants([]);
+    setAddError(null);
+  };
+
   const handleOpenEdit = (item: AdminMenuItemDto) => {
     setEditingItem(item);
     setEditName(item.name);
     setEditCategoryId(item.category_id);
     setEditPrice(String(item.base_price));
-    setEditIsVeg(item.is_veg);
+    setEditDietary(item.is_egg ? 'EGG' : item.is_veg ? 'VEG' : 'NON_VEG');
+    setEditSpiceLevel((item.spice_level as any) || 'NONE');
+    setEditTags(Array.isArray(item.tags) ? item.tags : []);
     setEditDescription(item.description || '');
+    setEditImagePath(item.image_path || null);
+    setEditImagePreview(item.image_path ? resolveMediaUrl(item.image_path) : null);
+    setEditImageStats(null);
+    setEditVariants(
+      item.variants && item.variants.length > 0
+        ? item.variants.map(v => ({ id: v.id, name: v.name, price: String(v.price) }))
+        : []
+    );
     setEditError(null);
     setShowEditModal(true);
   };
@@ -105,25 +199,33 @@ export default function AdminMenuPage() {
   const handleSaveAdd = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!addName.trim() || !addPrice || !addCategoryId) {
-      setAddError('Please fill in Item Name, Category, and Price.');
+      setAddError('Please fill in Item Name, Category, and Base Price.');
       return;
     }
     setAddSaving(true);
     setAddError(null);
     try {
+      const validVariants = addVariants
+        .filter(v => v.name.trim() && !isNaN(Number(v.price)))
+        .map(v => ({ name: v.name.trim(), price: Number(v.price) }));
+
       const created = await createAdminMenuItem({
         name: addName.trim(),
         category_id: addCategoryId,
         base_price: Number(addPrice),
-        is_veg: addIsVeg,
+        is_veg: addDietary === 'VEG',
+        is_egg: addDietary === 'EGG',
+        spice_level: addSpiceLevel,
+        tags: addTags,
         description: addDescription.trim() || undefined,
-        is_available: true
+        image_path: addImagePath,
+        is_available: true,
+        variants: validVariants.length > 0 ? validVariants : undefined
       });
+
       setShowAddModal(false);
-      setAddName('');
-      setAddPrice('');
-      setAddDescription('');
-      setFeedback(`Added new item "${created.name}" to menu!`);
+      resetAddForm();
+      setFeedback(`Added new item "${created.name}" with Supabase WebP photo!`);
       loadMenu();
     } catch (err: any) {
       setAddError(err.message || 'Failed to create menu item');
@@ -136,22 +238,32 @@ export default function AdminMenuPage() {
     e.preventDefault();
     if (!editingItem) return;
     if (!editName.trim() || !editPrice) {
-      setEditError('Please fill in Item Name and Price.');
+      setEditError('Please fill in Item Name and Base Price.');
       return;
     }
     setEditSaving(true);
     setEditError(null);
     try {
+      const validVariants = editVariants
+        .filter(v => v.name.trim() && !isNaN(Number(v.price)))
+        .map(v => ({ name: v.name.trim(), price: Number(v.price) }));
+
       const updated = await updateAdminMenuItem(editingItem.id, {
         name: editName.trim(),
         category_id: editCategoryId,
         base_price: Number(editPrice),
-        is_veg: editIsVeg,
-        description: editDescription.trim()
+        is_veg: editDietary === 'VEG',
+        is_egg: editDietary === 'EGG',
+        spice_level: editSpiceLevel,
+        tags: editTags,
+        description: editDescription.trim(),
+        image_path: editImagePath,
+        variants: validVariants
       });
+
       setShowEditModal(false);
       setFeedback(`Updated item "${updated.name}" successfully!`);
-      setItems(prev => prev.map(i => (i.id === updated.id ? { ...i, ...updated } : i)));
+      loadMenu();
     } catch (err: any) {
       setEditError(err.message || 'Failed to update menu item');
     } finally {
@@ -185,6 +297,56 @@ export default function AdminMenuPage() {
     }
   };
 
+  const toggleTag = (tag: string, isEdit: boolean) => {
+    if (isEdit) {
+      setEditTags(prev => prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]);
+    } else {
+      setAddTags(prev => prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]);
+    }
+  };
+
+  const applyHalfFullPreset = (isEdit: boolean, currentBasePrice: string) => {
+    const base = Number(currentBasePrice) || 0;
+    const half = Math.round(base * 0.6) || 40;
+    const full = base || 70;
+    const newVariants = [
+      { name: 'Half', price: String(half) },
+      { name: 'Full', price: String(full) }
+    ];
+    if (isEdit) setEditVariants(newVariants);
+    else setAddVariants(newVariants);
+  };
+
+  const applyRegularLargePreset = (isEdit: boolean, currentBasePrice: string) => {
+    const base = Number(currentBasePrice) || 0;
+    const regular = base || 50;
+    const large = Math.round(base * 1.5) || 80;
+    const newVariants = [
+      { name: 'Regular', price: String(regular) },
+      { name: 'Large', price: String(large) }
+    ];
+    if (isEdit) setEditVariants(newVariants);
+    else setAddVariants(newVariants);
+  };
+
+  const addEmptyVariant = (isEdit: boolean) => {
+    if (isEdit) setEditVariants(prev => [...prev, { name: '', price: '' }]);
+    else setAddVariants(prev => [...prev, { name: '', price: '' }]);
+  };
+
+  const removeVariant = (index: number, isEdit: boolean) => {
+    if (isEdit) setEditVariants(prev => prev.filter((_, i) => i !== index));
+    else setAddVariants(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const updateVariantRow = (index: number, field: 'name' | 'price', value: string, isEdit: boolean) => {
+    if (isEdit) {
+      setEditVariants(prev => prev.map((v, i) => i === index ? { ...v, [field]: value } : v));
+    } else {
+      setAddVariants(prev => prev.map((v, i) => i === index ? { ...v, [field]: value } : v));
+    }
+  };
+
   const filteredItems = items.filter(item => {
     const matchesFilter =
       availabilityFilter === 'ALL' ||
@@ -192,27 +354,50 @@ export default function AdminMenuPage() {
       (availabilityFilter === 'UNAVAILABLE' && !item.is_available);
     const matchesCategory =
       selectedCategoryFilter === 'ALL' || item.category_id === selectedCategoryFilter;
-    const query = searchQuery.toLowerCase().trim();
-    const matchesSearch =
-      !query ||
-      item.name.toLowerCase().includes(query) ||
-      item.slug.toLowerCase().includes(query) ||
-      (item.description && item.description.toLowerCase().includes(query));
+
+    const rawQuery = searchQuery.toLowerCase().trim();
+    const keywords = rawQuery ? rawQuery.split(/\s+/).filter(Boolean) : [];
+
+    let matchesSearch = true;
+    if (keywords.length > 0) {
+      const categoryName = categories.find(c => c.id === item.category_id)?.name || '';
+      const tagsText = (item.tags || []).join(' ');
+      const variantsText = (item.variants || []).map(v => v.name).join(' ');
+      const dietText = item.is_veg ? 'veg pure veg' : (item.is_egg ? 'egg' : 'non-veg nonveg');
+      const spiceText = item.spice_level || '';
+      const searchable = [
+        item.name,
+        item.slug,
+        item.description || '',
+        categoryName,
+        tagsText,
+        variantsText,
+        dietText,
+        spiceText
+      ].join(' ').toLowerCase();
+
+      matchesSearch = keywords.every(kw => searchable.includes(kw));
+    }
+
     return matchesFilter && matchesCategory && matchesSearch;
   });
-
-  const totalCount = items.length;
-  const availableCount = items.filter(i => i.is_available).length;
-  const unavailableCount = totalCount - availableCount;
 
   return (
     <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', flexWrap: 'wrap', gap: '16px' }}>
         <div>
-          <h1 style={{ fontSize: '24px', fontWeight: 800, color: '#1E2328' }}>Menu Catalog & Availability Control</h1>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+            <span style={{ fontSize: '11px', fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase', padding: '3px 8px', borderRadius: '4px', backgroundColor: '#FEF3C7', color: '#B45309' }}>
+              Zomato-Style Partner Console
+            </span>
+            <span style={{ fontSize: '11px', fontWeight: 600, color: '#10B981' }}>
+              ● Supabase WebP Storage Active
+            </span>
+          </div>
+          <h1 style={{ fontSize: '24px', fontWeight: 800, color: '#1E2328' }}>Menu Catalog & Variants Control</h1>
           <p style={{ fontSize: '13px', color: '#64748B', marginTop: '2px' }}>
-            Live stock switches & item updates affect both customer storefront and billing POS instantaneously
+            Live stock switches, portion pricing (Half/Full), spice indicators & high-res WebP food media synced across POS and web storefront.
           </p>
         </div>
         <div style={{ display: 'flex', gap: '10px' }}>
@@ -236,11 +421,11 @@ export default function AdminMenuPage() {
               boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
             }}
           >
-            + Add New Category
+            + New Category
           </button>
           <button
             onClick={() => {
-              setAddError(null);
+              resetAddForm();
               setShowAddModal(true);
             }}
             style={{
@@ -255,68 +440,60 @@ export default function AdminMenuPage() {
               display: 'flex',
               alignItems: 'center',
               gap: '6px',
-              boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+              boxShadow: '0 2px 4px rgba(111, 67, 42, 0.2)'
             }}
           >
-            + Add New Menu Item
-          </button>
-          <button
-            onClick={loadMenu}
-            disabled={loading}
-            style={{
-              padding: '9px 16px',
-              backgroundColor: '#FFFFFF',
-              border: '1px solid var(--cw-color-border)',
-              borderRadius: 'var(--cw-radius-md)',
-              fontSize: '13px',
-              fontWeight: 600,
-              cursor: loading ? 'not-allowed' : 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px'
-            }}
-          >
-            {loading ? 'Refreshing...' : '🔄 Refresh Catalog'}
+            + Add New Dish
           </button>
         </div>
       </div>
 
+      {/* Feedback Alert */}
       {feedback && (
-        <div style={{ padding: '12px 16px', backgroundColor: '#DCFCE7', color: '#16A34A', borderRadius: 'var(--cw-radius-md)', marginBottom: '16px', fontSize: '13px', fontWeight: 600 }}>
+        <div
+          style={{
+            backgroundColor: '#ECFDF5',
+            color: '#065F46',
+            border: '1px solid #A7F3D0',
+            padding: '12px 18px',
+            borderRadius: 'var(--cw-radius-md)',
+            marginBottom: '20px',
+            fontSize: '13px',
+            fontWeight: 600,
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px'
+          }}
+        >
           ✓ {feedback}
         </div>
       )}
 
+      {/* Error Alert */}
       {error && (
-        <div style={{ padding: '14px', backgroundColor: '#FEE2E2', color: '#991B1B', borderRadius: 'var(--cw-radius-md)', marginBottom: '20px', fontSize: '13px' }}>
-          ⚠️ {error} • <button onClick={loadMenu} style={{ background: 'transparent', border: 'none', textDecoration: 'underline', color: '#991B1B', cursor: 'pointer', fontWeight: 700 }}>Click here to retry</button>
+        <div
+          style={{
+            backgroundColor: '#FEF2F2',
+            color: '#991B1B',
+            border: '1px solid #FECACA',
+            padding: '12px 18px',
+            borderRadius: 'var(--cw-radius-md)',
+            marginBottom: '20px',
+            fontSize: '13px'
+          }}
+        >
+          ⚠️ {error}
         </div>
       )}
 
-      {/* KPI Counters */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '16px', marginBottom: '20px' }}>
-        <div style={{ backgroundColor: '#FFFFFF', padding: '14px 18px', borderRadius: 'var(--cw-radius-md)', border: '1px solid var(--cw-color-border)' }}>
-          <div style={{ fontSize: '11px', color: '#64748B', fontWeight: 600, textTransform: 'uppercase' }}>Total Catalog Items</div>
-          <div style={{ fontSize: '22px', fontWeight: 800, color: '#1E2328', marginTop: '4px' }}>{totalCount}</div>
-        </div>
-        <div style={{ backgroundColor: '#FFFFFF', padding: '14px 18px', borderRadius: 'var(--cw-radius-md)', border: '1px solid var(--cw-color-border)' }}>
-          <div style={{ fontSize: '11px', color: '#16A34A', fontWeight: 600, textTransform: 'uppercase' }}>Active in Storefront</div>
-          <div style={{ fontSize: '22px', fontWeight: 800, color: '#16A34A', marginTop: '4px' }}>{availableCount}</div>
-        </div>
-        <div style={{ backgroundColor: '#FFFFFF', padding: '14px 18px', borderRadius: 'var(--cw-radius-md)', border: '1px solid var(--cw-color-border)' }}>
-          <div style={{ fontSize: '11px', color: '#DC2626', fontWeight: 600, textTransform: 'uppercase' }}>Sold Out / 86’d</div>
-          <div style={{ fontSize: '22px', fontWeight: 800, color: '#DC2626', marginTop: '4px' }}>{unavailableCount}</div>
-        </div>
-      </div>
-
-      {/* Zomato-Style Category Selector Pills */}
+      {/* Categories Tabs */}
       <div
         style={{
           display: 'flex',
           gap: '8px',
           overflowX: 'auto',
-          paddingBottom: '8px',
-          marginBottom: '20px',
+          paddingBottom: '12px',
+          marginBottom: '16px',
           whiteSpace: 'nowrap'
         }}
       >
@@ -399,7 +576,7 @@ export default function AdminMenuPage() {
 
         <input
           type="text"
-          placeholder="Search items by name..."
+          placeholder="Search dishes by name, category, tags, spice, variants, or keywords..."
           value={searchQuery}
           onChange={e => setSearchQuery(e.target.value)}
           style={{
@@ -424,7 +601,7 @@ export default function AdminMenuPage() {
       >
         {loading && items.length === 0 ? (
           <div style={{ padding: '40px', textAlign: 'center', color: '#64748B' }}>
-            <p style={{ fontSize: '15px', fontWeight: 600 }}>Loading menu items from database...</p>
+            <p style={{ fontSize: '15px', fontWeight: 600 }}>Loading menu items from Supabase...</p>
           </div>
         ) : filteredItems.length === 0 ? (
           <div style={{ padding: '40px', textAlign: 'center', color: '#64748B' }}>
@@ -435,9 +612,9 @@ export default function AdminMenuPage() {
             <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '13px' }}>
               <thead>
                 <tr style={{ backgroundColor: '#F8FAFC', borderBottom: '1px solid var(--cw-color-border)' }}>
-                  <th style={{ padding: '12px 16px', fontWeight: 600, color: '#475569' }}>Item Details</th>
-                  <th style={{ padding: '12px 16px', fontWeight: 600, color: '#475569' }}>Dietary</th>
-                  <th style={{ padding: '12px 16px', fontWeight: 600, color: '#475569' }}>Price</th>
+                  <th style={{ padding: '12px 16px', fontWeight: 600, color: '#475569' }}>Dish / Media</th>
+                  <th style={{ padding: '12px 16px', fontWeight: 600, color: '#475569' }}>Dietary & Spice</th>
+                  <th style={{ padding: '12px 16px', fontWeight: 600, color: '#475569' }}>Pricing & Variants</th>
                   <th style={{ padding: '12px 16px', fontWeight: 600, color: '#475569' }}>Storefront Status</th>
                   <th style={{ padding: '12px 16px', fontWeight: 600, color: '#475569', textAlign: 'right' }}>Actions</th>
                 </tr>
@@ -445,6 +622,8 @@ export default function AdminMenuPage() {
               <tbody>
                 {filteredItems.map(item => {
                   const isToggling = togglingId === item.id;
+                  const itemImgUrl = item.image_path ? resolveMediaUrl(item.image_path) : null;
+                  const hasVariants = item.variants && item.variants.length > 0;
 
                   return (
                     <tr
@@ -455,50 +634,117 @@ export default function AdminMenuPage() {
                         transition: 'background-color 0.15s'
                       }}
                     >
-                      {/* Name & Description */}
-                      <td style={{ padding: '14px 16px' }}>
-                        <div style={{ fontWeight: 700, color: item.is_available ? '#1E2328' : '#94A3B8' }}>
-                          {item.name}
-                        </div>
-                        {item.description && (
-                          <div style={{ fontSize: '12px', color: '#64748B', marginTop: '2px', maxWidth: '340px' }}>
-                            {item.description}
+                      {/* Name & Photo Thumbnail */}
+                      <td style={{ padding: '12px 16px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                          <div
+                            style={{
+                              width: '48px',
+                              height: '48px',
+                              minWidth: '48px',
+                              borderRadius: '8px',
+                              overflow: 'hidden',
+                              backgroundColor: '#F8FAFC',
+                              border: '1px solid #E2E8F0',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center'
+                            }}
+                          >
+                            {itemImgUrl ? (
+                              <img
+                                src={itemImgUrl}
+                                alt={item.name}
+                                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                                loading="lazy"
+                              />
+                            ) : (
+                              <span style={{ fontSize: '20px' }}>🍲</span>
+                            )}
                           </div>
-                        )}
-                        <div style={{ fontSize: '11px', color: '#94A3B8', fontFamily: 'monospace', marginTop: '2px' }}>
-                          slug: {item.slug}
+                          <div>
+                            <div style={{ fontWeight: 700, color: item.is_available ? '#1E2328' : '#94A3B8', fontSize: '14px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                              {item.name}
+                              {item.spice_level && item.spice_level !== 'NONE' && (
+                                <span title={`Spice level: ${item.spice_level}`}>
+                                  {item.spice_level === 'HOT' ? '🌶️🌶️🌶️' : item.spice_level === 'MEDIUM' ? '🌶️🌶️' : '🌶️'}
+                                </span>
+                              )}
+                            </div>
+                            {item.description && (
+                              <div style={{ fontSize: '12px', color: '#64748B', marginTop: '2px', maxWidth: '320px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                {item.description}
+                              </div>
+                            )}
+                            {item.tags && item.tags.length > 0 && (
+                              <div style={{ display: 'flex', gap: '4px', marginTop: '4px', flexWrap: 'wrap' }}>
+                                {item.tags.map(tag => (
+                                  <span key={tag} style={{ fontSize: '10px', padding: '1px 6px', borderRadius: '4px', backgroundColor: '#FEF3C7', color: '#92400E', fontWeight: 600 }}>
+                                    {tag}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                          </div>
                         </div>
                       </td>
 
-                      {/* Dietary Indicator */}
-                      <td style={{ padding: '14px 16px' }}>
-                        <span
-                          style={{
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '4px',
-                            fontSize: '11px',
-                            fontWeight: 700,
-                            padding: '3px 8px',
-                            borderRadius: '4px',
-                            backgroundColor: item.is_veg ? '#DCFCE7' : '#FEE2E2',
-                            color: item.is_veg ? '#16A34A' : '#DC2626'
-                          }}
-                        >
-                          ● {item.is_veg ? '100% Veg' : 'Non-Veg'}
-                        </span>
+                      {/* Dietary & Classification */}
+                      <td style={{ padding: '12px 16px' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'flex-start' }}>
+                          <span
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                              fontSize: '11px',
+                              fontWeight: 700,
+                              padding: '2px 8px',
+                              borderRadius: '4px',
+                              backgroundColor: item.is_egg ? '#FEF3C7' : item.is_veg ? '#DCFCE7' : '#FEE2E2',
+                              color: item.is_egg ? '#D97706' : item.is_veg ? '#16A34A' : '#DC2626'
+                            }}
+                          >
+                            ● {item.is_egg ? 'Egg Item' : item.is_veg ? '100% Veg' : 'Non-Veg'}
+                          </span>
+                          {item.image_path && (
+                            <span style={{ fontSize: '10px', color: '#059669', fontWeight: 600 }}>
+                              ✓ WebP Image
+                            </span>
+                          )}
+                        </div>
                       </td>
 
-                      {/* Base Price (Zero Tax Mode) */}
-                      <td style={{ padding: '14px 16px' }}>
+                      {/* Pricing & Variants */}
+                      <td style={{ padding: '12px 16px' }}>
                         <div style={{ fontWeight: 700, color: '#1E2328', fontSize: '14px' }}>
                           ₹{Number(item.base_price).toFixed(2)}
                         </div>
-                        <div style={{ fontSize: '10px', color: '#10B981', fontWeight: 600 }}>Zero-Tax Final Price</div>
+                        {hasVariants ? (
+                          <div style={{ marginTop: '4px', display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                            {item.variants!.map(v => (
+                              <span
+                                key={v.id || v.name}
+                                style={{
+                                  fontSize: '11px',
+                                  padding: '2px 6px',
+                                  borderRadius: '4px',
+                                  backgroundColor: '#F1F5F9',
+                                  color: '#334155',
+                                  fontWeight: 600
+                                }}
+                              >
+                                {v.name}: ₹{v.price}
+                              </span>
+                            ))}
+                          </div>
+                        ) : (
+                          <div style={{ fontSize: '11px', color: '#94A3B8' }}>Single Portion</div>
+                        )}
                       </td>
 
                       {/* Live Storefront Status */}
-                      <td style={{ padding: '14px 16px' }}>
+                      <td style={{ padding: '12px 16px' }}>
                         <span
                           style={{
                             display: 'inline-block',
@@ -515,7 +761,7 @@ export default function AdminMenuPage() {
                       </td>
 
                       {/* Action Buttons: Edit + Toggle */}
-                      <td style={{ padding: '14px 16px', textAlign: 'right' }}>
+                      <td style={{ padding: '12px 16px', textAlign: 'right' }}>
                         <div style={{ display: 'inline-flex', gap: '8px' }}>
                           <button
                             onClick={() => handleOpenEdit(item)}
@@ -559,7 +805,9 @@ export default function AdminMenuPage() {
         )}
       </div>
 
-      {/* Modal: Add New Menu Item */}
+      {/* ========================================================================= */}
+      {/* MODAL: ADD NEW MENU ITEM (Zomato Restaurant Partner Style)                 */}
+      {/* ========================================================================= */}
       {showAddModal && (
         <div
           style={{
@@ -570,135 +818,436 @@ export default function AdminMenuPage() {
             alignItems: 'center',
             justifyContent: 'center',
             zIndex: 9999,
-            padding: '20px'
+            padding: '20px',
+            overflowY: 'auto'
           }}
         >
           <div
             style={{
               backgroundColor: '#FFFFFF',
-              borderRadius: '12px',
+              borderRadius: '16px',
               width: '100%',
-              maxWidth: '480px',
-              padding: '28px',
+              maxWidth: '820px',
+              maxHeight: '92vh',
+              display: 'flex',
+              flexDirection: 'column',
               boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)',
-              border: '1px solid #E2E8F0'
+              border: '1px solid #E2E8F0',
+              overflow: 'hidden'
             }}
           >
-            <h2 style={{ fontSize: '18px', fontWeight: 800, color: '#0F172A', marginBottom: '4px' }}>
-              Add New Menu Item
-            </h2>
-            <p style={{ fontSize: '12px', color: '#64748B', marginBottom: '18px' }}>
-              Create a new item in the central catalog. It will immediately reflect in Storefront and BillBook.
-            </p>
-
-            {addError && (
-              <div style={{ backgroundColor: '#FEE2E2', color: '#991B1B', padding: '10px', borderRadius: '6px', fontSize: '12px', marginBottom: '14px' }}>
-                ⚠️ {addError}
+            {/* Modal Top Bar */}
+            <div
+              style={{
+                padding: '18px 24px',
+                borderBottom: '1px solid #E2E8F0',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                backgroundColor: '#F8FAFC'
+              }}
+            >
+              <div>
+                <span style={{ fontSize: '11px', fontWeight: 800, color: '#B45309', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  Zomato Partner Menu Manager
+                </span>
+                <h2 style={{ fontSize: '19px', fontWeight: 800, color: '#0F172A', margin: '2px 0 0 0' }}>
+                  Add New Dish
+                </h2>
               </div>
-            )}
+              <button
+                type="button"
+                onClick={() => setShowAddModal(false)}
+                style={{
+                  background: '#EDF2F7',
+                  border: 'none',
+                  borderRadius: '50%',
+                  width: '32px',
+                  height: '32px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                  fontSize: '16px',
+                  color: '#4A5568'
+                }}
+              >
+                ✕
+              </button>
+            </div>
 
-            <form onSubmit={handleSaveAdd}>
-              <div style={{ marginBottom: '14px' }}>
-                <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#334155', marginBottom: '4px' }}>
-                  Item Name *
-                </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. Masala Bun Maska"
-                  value={addName}
-                  onChange={(e) => setAddName(e.target.value)}
-                  style={{ width: '100%', padding: '9px 12px', borderRadius: '6px', border: '1px solid #CBD5E1', fontSize: '13px' }}
-                />
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '14px' }}>
-                <div>
-                  <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#334155', marginBottom: '4px' }}>
-                    Category *
-                  </label>
-                  <select
-                    value={addCategoryId}
-                    onChange={(e) => setAddCategoryId(e.target.value)}
-                    style={{ width: '100%', padding: '9px 12px', borderRadius: '6px', border: '1px solid #CBD5E1', fontSize: '13px', backgroundColor: '#FFFFFF' }}
-                  >
-                    {categories.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.name}
-                      </option>
-                    ))}
-                  </select>
+            {/* Scrollable Form Body */}
+            <form onSubmit={handleSaveAdd} style={{ padding: '24px', overflowY: 'auto', flex: 1 }}>
+              {addError && (
+                <div style={{ backgroundColor: '#FEE2E2', color: '#991B1B', padding: '10px 14px', borderRadius: '8px', fontSize: '12px', marginBottom: '16px', fontWeight: 600 }}>
+                  ⚠️ {addError}
                 </div>
+              )}
+
+              {/* Grid: Details (Left) & Image Upload (Right) */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '20px', marginBottom: '20px' }}>
+                {/* Left Column: Basic Details */}
                 <div>
-                  <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#334155', marginBottom: '4px' }}>
-                    Base Price (₹) *
-                  </label>
+                  <div style={{ marginBottom: '14px' }}>
+                    <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#334155', marginBottom: '4px' }}>
+                      Dish / Item Name *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="e.g. Masala Bun Maska, Kulhad Chai"
+                      value={addName}
+                      onChange={(e) => setAddName(e.target.value)}
+                      style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid #CBD5E1', fontSize: '13px', boxSizing: 'border-box' }}
+                    />
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '14px' }}>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#334155', marginBottom: '4px' }}>
+                        Category *
+                      </label>
+                      <select
+                        value={addCategoryId}
+                        onChange={(e) => setAddCategoryId(e.target.value)}
+                        style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid #CBD5E1', fontSize: '13px', backgroundColor: '#FFFFFF', boxSizing: 'border-box' }}
+                      >
+                        {categories.map((c) => (
+                          <option key={c.id} value={c.id}>
+                            {c.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#334155', marginBottom: '4px' }}>
+                        Base Price (₹) *
+                      </label>
+                      <input
+                        type="number"
+                        step="1"
+                        min="0"
+                        required
+                        placeholder="e.g. 50"
+                        value={addPrice}
+                        onChange={(e) => setAddPrice(e.target.value)}
+                        style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid #CBD5E1', fontSize: '13px', boxSizing: 'border-box' }}
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#334155', marginBottom: '4px' }}>
+                      Description (Optional)
+                    </label>
+                    <textarea
+                      rows={3}
+                      placeholder="Brief description of preparation, taste, and ingredients..."
+                      value={addDescription}
+                      onChange={(e) => setAddDescription(e.target.value)}
+                      style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid #CBD5E1', fontSize: '13px', boxSizing: 'border-box' }}
+                    />
+                  </div>
+                </div>
+
+                {/* Right Column: Image Uploader with WebP Converter */}
+                <div style={{ backgroundColor: '#F8FAFC', padding: '16px', borderRadius: '12px', border: '1px solid #E2E8F0', display: 'flex', flexDirection: 'column' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                    <label style={{ fontSize: '12px', fontWeight: 700, color: '#334155' }}>
+                      Dish Photo (Supabase Storage)
+                    </label>
+                    <span style={{ fontSize: '11px', color: '#059669', fontWeight: 700 }}>
+                      ⚡ Auto-WebP
+                    </span>
+                  </div>
+
+                  {/* Hidden File Input */}
                   <input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    required
-                    placeholder="e.g. 50"
-                    value={addPrice}
-                    onChange={(e) => setAddPrice(e.target.value)}
-                    style={{ width: '100%', padding: '9px 12px', borderRadius: '6px', border: '1px solid #CBD5E1', fontSize: '13px' }}
+                    type="file"
+                    ref={addFileInputRef}
+                    accept="image/*"
+                    style={{ display: 'none' }}
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) handleImageFileChange(file, false);
+                    }}
                   />
+
+                  {/* Photo Preview / Drop Area */}
+                  <div
+                    onClick={() => addFileInputRef.current?.click()}
+                    style={{
+                      flex: 1,
+                      minHeight: '140px',
+                      border: '2px dashed #CBD5E1',
+                      borderRadius: '8px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      cursor: 'pointer',
+                      backgroundColor: '#FFFFFF',
+                      padding: '12px',
+                      textAlign: 'center',
+                      position: 'relative',
+                      overflow: 'hidden'
+                    }}
+                  >
+                    {addImagePreview ? (
+                      <div style={{ position: 'relative', width: '100%', height: '100%', minHeight: '120px' }}>
+                        <img
+                          src={addImagePreview}
+                          alt="Dish Preview"
+                          style={{ width: '100%', height: '120px', objectFit: 'cover', borderRadius: '6px' }}
+                        />
+                        <div style={{ position: 'absolute', bottom: '4px', right: '4px', backgroundColor: 'rgba(0,0,0,0.6)', color: '#FFFFFF', padding: '2px 6px', borderRadius: '4px', fontSize: '10px' }}>
+                          Click to Change
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        <div style={{ fontSize: '28px', marginBottom: '4px' }}>📸</div>
+                        <div style={{ fontSize: '12px', fontWeight: 700, color: '#334155' }}>
+                          {addImageUploading ? 'Converting & Uploading...' : 'Upload Food Photo'}
+                        </div>
+                        <div style={{ fontSize: '11px', color: '#64748B', marginTop: '2px' }}>
+                          JPG, PNG, WEBP • Auto-compressed & converted to WebP
+                        </div>
+                      </>
+                    )}
+                  </div>
+
+                  {/* Compression Stats Badge */}
+                  {addImageStats && (
+                    <div style={{ marginTop: '8px', padding: '6px 10px', backgroundColor: '#ECFDF5', borderRadius: '6px', fontSize: '11px', color: '#065F46' }}>
+                      ✓ {formatBytes(addImageStats.orig)} ➔ <strong>{formatBytes(addImageStats.comp)} WebP</strong> ({addImageStats.savings}% saved)
+                    </div>
+                  )}
+
+                  {addImagePath && (
+                    <div style={{ marginTop: '6px', fontSize: '10px', color: '#64748B', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      Cloud Path: <code style={{ color: '#0F172A' }}>{addImagePath}</code>
+                    </div>
+                  )}
                 </div>
               </div>
 
-              <div style={{ marginBottom: '14px' }}>
-                <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#334155', marginBottom: '4px' }}>
-                  Dietary Classification
-                </label>
-                <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', cursor: 'pointer' }}>
-                    <input
-                      type="radio"
-                      name="isVeg"
-                      checked={addIsVeg === true}
-                      onChange={() => setAddIsVeg(true)}
-                    />
-                    <span style={{ color: '#16A34A', fontWeight: 700 }}>● Veg</span>
+              {/* Section: Dietary & Spice Level */}
+              <div style={{ padding: '14px 16px', backgroundColor: '#F8FAFC', borderRadius: '12px', border: '1px solid #E2E8F0', marginBottom: '20px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '20px' }}>
+                  {/* Dietary Switcher */}
+                  <div>
+                    <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#334155', marginBottom: '8px' }}>
+                      Dietary Classification
+                    </label>
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <button
+                        type="button"
+                        onClick={() => setAddDietary('VEG')}
+                        style={{
+                          flex: 1,
+                          padding: '8px 10px',
+                          borderRadius: '8px',
+                          fontSize: '12px',
+                          fontWeight: 700,
+                          cursor: 'pointer',
+                          border: addDietary === 'VEG' ? '2px solid #16A34A' : '1px solid #CBD5E1',
+                          backgroundColor: addDietary === 'VEG' ? '#DCFCE7' : '#FFFFFF',
+                          color: addDietary === 'VEG' ? '#16A34A' : '#475569'
+                        }}
+                      >
+                        🟢 Veg
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setAddDietary('EGG')}
+                        style={{
+                          flex: 1,
+                          padding: '8px 10px',
+                          borderRadius: '8px',
+                          fontSize: '12px',
+                          fontWeight: 700,
+                          cursor: 'pointer',
+                          border: addDietary === 'EGG' ? '2px solid #D97706' : '1px solid #CBD5E1',
+                          backgroundColor: addDietary === 'EGG' ? '#FEF3C7' : '#FFFFFF',
+                          color: addDietary === 'EGG' ? '#B45309' : '#475569'
+                        }}
+                      >
+                        🟡 Egg
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setAddDietary('NON_VEG')}
+                        style={{
+                          flex: 1,
+                          padding: '8px 10px',
+                          borderRadius: '8px',
+                          fontSize: '12px',
+                          fontWeight: 700,
+                          cursor: 'pointer',
+                          border: addDietary === 'NON_VEG' ? '2px solid #DC2626' : '1px solid #CBD5E1',
+                          backgroundColor: addDietary === 'NON_VEG' ? '#FEE2E2' : '#FFFFFF',
+                          color: addDietary === 'NON_VEG' ? '#DC2626' : '#475569'
+                        }}
+                      >
+                        🔴 Non-Veg
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Spiciness Level */}
+                  <div>
+                    <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#334155', marginBottom: '8px' }}>
+                      Taste & Spiciness
+                    </label>
+                    <div style={{ display: 'flex', gap: '6px' }}>
+                      {(['NONE', 'MILD', 'MEDIUM', 'HOT'] as const).map(lvl => (
+                        <button
+                          key={lvl}
+                          type="button"
+                          onClick={() => setAddSpiceLevel(lvl)}
+                          style={{
+                            flex: 1,
+                            padding: '8px 6px',
+                            borderRadius: '8px',
+                            fontSize: '11px',
+                            fontWeight: 700,
+                            cursor: 'pointer',
+                            border: addSpiceLevel === lvl ? '2px solid #E11D48' : '1px solid #CBD5E1',
+                            backgroundColor: addSpiceLevel === lvl ? '#FFE4E6' : '#FFFFFF',
+                            color: addSpiceLevel === lvl ? '#BE123C' : '#475569'
+                          }}
+                        >
+                          {lvl === 'NONE' ? '🌱 None' : lvl === 'MILD' ? '🌶️ Mild' : lvl === 'MEDIUM' ? '🌶️🌶️ Med' : '🌶️🌶️🌶️ Hot'}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Popular Tags Chips */}
+                <div style={{ marginTop: '14px' }}>
+                  <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#334155', marginBottom: '6px' }}>
+                    Menu Badges & Merchandising Tags
                   </label>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', cursor: 'pointer' }}>
-                    <input
-                      type="radio"
-                      name="isVeg"
-                      checked={addIsVeg === false}
-                      onChange={() => setAddIsVeg(false)}
-                    />
-                    <span style={{ color: '#DC2626', fontWeight: 700 }}>● Non-Veg</span>
-                  </label>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                    {POPULAR_TAG_OPTIONS.map(tag => {
+                      const active = addTags.includes(tag);
+                      return (
+                        <button
+                          key={tag}
+                          type="button"
+                          onClick={() => toggleTag(tag, false)}
+                          style={{
+                            padding: '4px 10px',
+                            borderRadius: '20px',
+                            fontSize: '11px',
+                            fontWeight: 600,
+                            cursor: 'pointer',
+                            border: active ? '1.5px solid #D97706' : '1px solid #CBD5E1',
+                            backgroundColor: active ? '#FEF3C7' : '#FFFFFF',
+                            color: active ? '#92400E' : '#64748B'
+                          }}
+                        >
+                          {active ? '✓ ' : '+ '}{tag}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
               </div>
 
-              <div style={{ marginBottom: '20px' }}>
-                <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#334155', marginBottom: '4px' }}>
-                  Description (Optional)
-                </label>
-                <textarea
-                  rows={2}
-                  placeholder="Brief dish description..."
-                  value={addDescription}
-                  onChange={(e) => setAddDescription(e.target.value)}
-                  style={{ width: '100%', padding: '9px 12px', borderRadius: '6px', border: '1px solid #CBD5E1', fontSize: '13px' }}
-                />
+              {/* Section: Portions & Variants (Half / Full, Regular / Large) */}
+              <div style={{ padding: '16px', backgroundColor: '#F8FAFC', borderRadius: '12px', border: '1px solid #E2E8F0', marginBottom: '20px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px', flexWrap: 'wrap', gap: '8px' }}>
+                  <div>
+                    <h3 style={{ margin: 0, fontSize: '13px', fontWeight: 800, color: '#0F172A' }}>
+                      Portions & Variants (Half / Full, Sizes)
+                    </h3>
+                    <p style={{ margin: '2px 0 0 0', fontSize: '11px', color: '#64748B' }}>
+                      Offer customer options like Half vs Full plate or Small vs Large portion with custom prices.
+                    </p>
+                  </div>
+                  <div style={{ display: 'flex', gap: '6px' }}>
+                    <button
+                      type="button"
+                      onClick={() => applyHalfFullPreset(false, addPrice)}
+                      style={{ padding: '4px 8px', borderRadius: '6px', fontSize: '11px', fontWeight: 700, backgroundColor: '#FEF3C7', color: '#B45309', border: '1px solid #FCD34D', cursor: 'pointer' }}
+                    >
+                      + Half / Full
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => applyRegularLargePreset(false, addPrice)}
+                      style={{ padding: '4px 8px', borderRadius: '6px', fontSize: '11px', fontWeight: 700, backgroundColor: '#E0E7FF', color: '#4338CA', border: '1px solid #C7D2FE', cursor: 'pointer' }}
+                    >
+                      + Reg / Large
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => addEmptyVariant(false)}
+                      style={{ padding: '4px 8px', borderRadius: '6px', fontSize: '11px', fontWeight: 700, backgroundColor: '#FFFFFF', color: '#0F172A', border: '1px solid #CBD5E1', cursor: 'pointer' }}
+                    >
+                      + Custom Variant
+                    </button>
+                  </div>
+                </div>
+
+                {addVariants.length === 0 ? (
+                  <div style={{ padding: '14px', textAlign: 'center', backgroundColor: '#FFFFFF', borderRadius: '8px', border: '1px dashed #CBD5E1', color: '#64748B', fontSize: '12px' }}>
+                    Single portion dish. Base price <strong>₹{addPrice || 0}</strong> applies. Click &quot;+ Half / Full&quot; above to add portion variants.
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    {addVariants.map((v, idx) => (
+                      <div key={idx} style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                        <input
+                          type="text"
+                          placeholder="e.g. Half, Full, 250ml"
+                          value={v.name}
+                          onChange={(e) => updateVariantRow(idx, 'name', e.target.value, false)}
+                          style={{ flex: 2, padding: '8px 10px', borderRadius: '6px', border: '1px solid #CBD5E1', fontSize: '12px' }}
+                        />
+                        <div style={{ flex: 1, display: 'flex', alignItems: 'center', position: 'relative' }}>
+                          <span style={{ position: 'absolute', left: '8px', color: '#64748B', fontSize: '12px' }}>₹</span>
+                          <input
+                            type="number"
+                            placeholder="Price"
+                            value={v.price}
+                            onChange={(e) => updateVariantRow(idx, 'price', e.target.value, false)}
+                            style={{ width: '100%', padding: '8px 10px 8px 20px', borderRadius: '6px', border: '1px solid #CBD5E1', fontSize: '12px' }}
+                          />
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => removeVariant(idx, false)}
+                          style={{ background: '#FEE2E2', border: 'none', color: '#DC2626', width: '28px', height: '28px', borderRadius: '6px', cursor: 'pointer', fontWeight: 700 }}
+                          title="Remove variant"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
-              <div style={{ display: 'flex', gap: '10px' }}>
+              {/* Action Buttons */}
+              <div style={{ display: 'flex', gap: '12px', marginTop: '16px' }}>
                 <button
                   type="button"
                   onClick={() => setShowAddModal(false)}
-                  style={{ flex: 1, padding: '10px', backgroundColor: '#F1F5F9', border: 'none', borderRadius: '6px', fontSize: '13px', fontWeight: 600, color: '#475569', cursor: 'pointer' }}
+                  style={{ flex: 1, padding: '12px', backgroundColor: '#F1F5F9', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, color: '#475569', cursor: 'pointer' }}
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  disabled={addSaving}
-                  style={{ flex: 2, padding: '10px', backgroundColor: 'var(--cw-color-primary)', color: '#FFFFFF', border: 'none', borderRadius: '6px', fontSize: '13px', fontWeight: 700, cursor: addSaving ? 'not-allowed' : 'pointer' }}
+                  disabled={addSaving || addImageUploading}
+                  style={{ flex: 2, padding: '12px', backgroundColor: 'var(--cw-color-primary)', color: '#FFFFFF', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 700, cursor: (addSaving || addImageUploading) ? 'not-allowed' : 'pointer' }}
                 >
-                  {addSaving ? 'Saving Item...' : 'Save & Publish Item'}
+                  {addImageUploading ? 'Uploading WebP Photo...' : addSaving ? 'Publishing Item...' : 'Save & Publish to Menu'}
                 </button>
               </div>
             </form>
@@ -706,7 +1255,9 @@ export default function AdminMenuPage() {
         </div>
       )}
 
-      {/* Modal: Edit Existing Menu Item */}
+      {/* ========================================================================= */}
+      {/* MODAL: EDIT MENU ITEM (Zomato Restaurant Partner Style)                     */}
+      {/* ========================================================================= */}
       {showEditModal && editingItem && (
         <div
           style={{
@@ -717,132 +1268,447 @@ export default function AdminMenuPage() {
             alignItems: 'center',
             justifyContent: 'center',
             zIndex: 9999,
-            padding: '20px'
+            padding: '20px',
+            overflowY: 'auto'
           }}
         >
           <div
             style={{
               backgroundColor: '#FFFFFF',
-              borderRadius: '12px',
+              borderRadius: '16px',
               width: '100%',
-              maxWidth: '480px',
-              padding: '28px',
+              maxWidth: '820px',
+              maxHeight: '92vh',
+              display: 'flex',
+              flexDirection: 'column',
               boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)',
-              border: '1px solid #E2E8F0'
+              border: '1px solid #E2E8F0',
+              overflow: 'hidden'
             }}
           >
-            <h2 style={{ fontSize: '18px', fontWeight: 800, color: '#0F172A', marginBottom: '4px' }}>
-              Edit Menu Item
-            </h2>
-            <p style={{ fontSize: '12px', color: '#64748B', marginBottom: '18px' }}>
-              Modify details for &quot;{editingItem.name}&quot;. Updates sync live across all platforms.
-            </p>
-
-            {editError && (
-              <div style={{ backgroundColor: '#FEE2E2', color: '#991B1B', padding: '10px', borderRadius: '6px', fontSize: '12px', marginBottom: '14px' }}>
-                ⚠️ {editError}
+            {/* Modal Top Bar */}
+            <div
+              style={{
+                padding: '18px 24px',
+                borderBottom: '1px solid #E2E8F0',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                backgroundColor: '#F8FAFC'
+              }}
+            >
+              <div>
+                <span style={{ fontSize: '11px', fontWeight: 800, color: '#B45309', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  Zomato Partner Menu Manager
+                </span>
+                <h2 style={{ fontSize: '19px', fontWeight: 800, color: '#0F172A', margin: '2px 0 0 0' }}>
+                  Edit Dish: {editingItem.name}
+                </h2>
               </div>
-            )}
+              <button
+                type="button"
+                onClick={() => setShowEditModal(false)}
+                style={{
+                  background: '#EDF2F7',
+                  border: 'none',
+                  borderRadius: '50%',
+                  width: '32px',
+                  height: '32px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                  fontSize: '16px',
+                  color: '#4A5568'
+                }}
+              >
+                ✕
+              </button>
+            </div>
 
-            <form onSubmit={handleSaveEdit}>
-              <div style={{ marginBottom: '14px' }}>
-                <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#334155', marginBottom: '4px' }}>
-                  Item Name *
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={editName}
-                  onChange={(e) => setEditName(e.target.value)}
-                  style={{ width: '100%', padding: '9px 12px', borderRadius: '6px', border: '1px solid #CBD5E1', fontSize: '13px' }}
-                />
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '14px' }}>
-                <div>
-                  <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#334155', marginBottom: '4px' }}>
-                    Category *
-                  </label>
-                  <select
-                    value={editCategoryId}
-                    onChange={(e) => setEditCategoryId(e.target.value)}
-                    style={{ width: '100%', padding: '9px 12px', borderRadius: '6px', border: '1px solid #CBD5E1', fontSize: '13px', backgroundColor: '#FFFFFF' }}
-                  >
-                    {categories.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.name}
-                      </option>
-                    ))}
-                  </select>
+            {/* Scrollable Form Body */}
+            <form onSubmit={handleSaveEdit} style={{ padding: '24px', overflowY: 'auto', flex: 1 }}>
+              {editError && (
+                <div style={{ backgroundColor: '#FEE2E2', color: '#991B1B', padding: '10px 14px', borderRadius: '8px', fontSize: '12px', marginBottom: '16px', fontWeight: 600 }}>
+                  ⚠️ {editError}
                 </div>
+              )}
+
+              {/* Grid: Details (Left) & Image Upload (Right) */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '20px', marginBottom: '20px' }}>
+                {/* Left Column: Basic Details */}
                 <div>
-                  <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#334155', marginBottom: '4px' }}>
-                    Base Price (₹) *
-                  </label>
+                  <div style={{ marginBottom: '14px' }}>
+                    <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#334155', marginBottom: '4px' }}>
+                      Dish / Item Name *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={editName}
+                      onChange={(e) => setEditName(e.target.value)}
+                      style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid #CBD5E1', fontSize: '13px', boxSizing: 'border-box' }}
+                    />
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '14px' }}>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#334155', marginBottom: '4px' }}>
+                        Category *
+                      </label>
+                      <select
+                        value={editCategoryId}
+                        onChange={(e) => setEditCategoryId(e.target.value)}
+                        style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid #CBD5E1', fontSize: '13px', backgroundColor: '#FFFFFF', boxSizing: 'border-box' }}
+                      >
+                        {categories.map((c) => (
+                          <option key={c.id} value={c.id}>
+                            {c.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#334155', marginBottom: '4px' }}>
+                        Base Price (₹) *
+                      </label>
+                      <input
+                        type="number"
+                        step="1"
+                        min="0"
+                        required
+                        value={editPrice}
+                        onChange={(e) => setEditPrice(e.target.value)}
+                        style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid #CBD5E1', fontSize: '13px', boxSizing: 'border-box' }}
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#334155', marginBottom: '4px' }}>
+                      Description
+                    </label>
+                    <textarea
+                      rows={3}
+                      value={editDescription}
+                      onChange={(e) => setEditDescription(e.target.value)}
+                      style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid #CBD5E1', fontSize: '13px', boxSizing: 'border-box' }}
+                    />
+                  </div>
+                </div>
+
+                {/* Right Column: Image Uploader with WebP Converter */}
+                <div style={{ backgroundColor: '#F8FAFC', padding: '16px', borderRadius: '12px', border: '1px solid #E2E8F0', display: 'flex', flexDirection: 'column' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                    <label style={{ fontSize: '12px', fontWeight: 700, color: '#334155' }}>
+                      Dish Photo (Supabase Storage)
+                    </label>
+                    <span style={{ fontSize: '11px', color: '#059669', fontWeight: 700 }}>
+                      ⚡ Auto-WebP
+                    </span>
+                  </div>
+
+                  {/* Hidden File Input */}
                   <input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    required
-                    value={editPrice}
-                    onChange={(e) => setEditPrice(e.target.value)}
-                    style={{ width: '100%', padding: '9px 12px', borderRadius: '6px', border: '1px solid #CBD5E1', fontSize: '13px' }}
+                    type="file"
+                    ref={editFileInputRef}
+                    accept="image/*"
+                    style={{ display: 'none' }}
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) handleImageFileChange(file, true);
+                    }}
                   />
+
+                  {/* Photo Preview / Drop Area */}
+                  <div
+                    onClick={() => editFileInputRef.current?.click()}
+                    style={{
+                      flex: 1,
+                      minHeight: '140px',
+                      border: '2px dashed #CBD5E1',
+                      borderRadius: '8px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      cursor: 'pointer',
+                      backgroundColor: '#FFFFFF',
+                      padding: '12px',
+                      textAlign: 'center',
+                      position: 'relative',
+                      overflow: 'hidden'
+                    }}
+                  >
+                    {editImagePreview ? (
+                      <div style={{ position: 'relative', width: '100%', height: '100%', minHeight: '120px' }}>
+                        <img
+                          src={editImagePreview}
+                          alt="Dish Preview"
+                          style={{ width: '100%', height: '120px', objectFit: 'cover', borderRadius: '6px' }}
+                        />
+                        <div style={{ position: 'absolute', bottom: '4px', right: '4px', backgroundColor: 'rgba(0,0,0,0.6)', color: '#FFFFFF', padding: '2px 6px', borderRadius: '4px', fontSize: '10px' }}>
+                          Click to Replace
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        <div style={{ fontSize: '28px', marginBottom: '4px' }}>📸</div>
+                        <div style={{ fontSize: '12px', fontWeight: 700, color: '#334155' }}>
+                          {editImageUploading ? 'Converting & Uploading...' : 'Upload Food Photo'}
+                        </div>
+                        <div style={{ fontSize: '11px', color: '#64748B', marginTop: '2px' }}>
+                          JPG, PNG, WEBP • Auto-compressed & converted to WebP
+                        </div>
+                      </>
+                    )}
+                  </div>
+
+                  {/* Compression Stats Badge */}
+                  {editImageStats && (
+                    <div style={{ marginTop: '8px', padding: '6px 10px', backgroundColor: '#ECFDF5', borderRadius: '6px', fontSize: '11px', color: '#065F46' }}>
+                      ✓ {formatBytes(editImageStats.orig)} ➔ <strong>{formatBytes(editImageStats.comp)} WebP</strong> ({editImageStats.savings}% saved)
+                    </div>
+                  )}
+
+                  {editImagePath && (
+                    <div style={{ marginTop: '6px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ fontSize: '10px', color: '#64748B', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '200px' }}>
+                        Path: {editImagePath}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setEditImagePath(null);
+                          setEditImagePreview(null);
+                          setEditImageStats(null);
+                        }}
+                        style={{ background: 'none', border: 'none', color: '#DC2626', fontSize: '11px', cursor: 'pointer', fontWeight: 600 }}
+                      >
+                        Remove Photo
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
 
-              <div style={{ marginBottom: '14px' }}>
-                <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#334155', marginBottom: '4px' }}>
-                  Dietary Classification
-                </label>
-                <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', cursor: 'pointer' }}>
-                    <input
-                      type="radio"
-                      name="editIsVeg"
-                      checked={editIsVeg === true}
-                      onChange={() => setEditIsVeg(true)}
-                    />
-                    <span style={{ color: '#16A34A', fontWeight: 700 }}>● Veg</span>
+              {/* Section: Dietary & Spice Level */}
+              <div style={{ padding: '14px 16px', backgroundColor: '#F8FAFC', borderRadius: '12px', border: '1px solid #E2E8F0', marginBottom: '20px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '20px' }}>
+                  {/* Dietary Switcher */}
+                  <div>
+                    <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#334155', marginBottom: '8px' }}>
+                      Dietary Classification
+                    </label>
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <button
+                        type="button"
+                        onClick={() => setEditDietary('VEG')}
+                        style={{
+                          flex: 1,
+                          padding: '8px 10px',
+                          borderRadius: '8px',
+                          fontSize: '12px',
+                          fontWeight: 700,
+                          cursor: 'pointer',
+                          border: editDietary === 'VEG' ? '2px solid #16A34A' : '1px solid #CBD5E1',
+                          backgroundColor: editDietary === 'VEG' ? '#DCFCE7' : '#FFFFFF',
+                          color: editDietary === 'VEG' ? '#16A34A' : '#475569'
+                        }}
+                      >
+                        🟢 Veg
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setEditDietary('EGG')}
+                        style={{
+                          flex: 1,
+                          padding: '8px 10px',
+                          borderRadius: '8px',
+                          fontSize: '12px',
+                          fontWeight: 700,
+                          cursor: 'pointer',
+                          border: editDietary === 'EGG' ? '2px solid #D97706' : '1px solid #CBD5E1',
+                          backgroundColor: editDietary === 'EGG' ? '#FEF3C7' : '#FFFFFF',
+                          color: editDietary === 'EGG' ? '#B45309' : '#475569'
+                        }}
+                      >
+                        🟡 Egg
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setEditDietary('NON_VEG')}
+                        style={{
+                          flex: 1,
+                          padding: '8px 10px',
+                          borderRadius: '8px',
+                          fontSize: '12px',
+                          fontWeight: 700,
+                          cursor: 'pointer',
+                          border: editDietary === 'NON_VEG' ? '2px solid #DC2626' : '1px solid #CBD5E1',
+                          backgroundColor: editDietary === 'NON_VEG' ? '#FEE2E2' : '#FFFFFF',
+                          color: editDietary === 'NON_VEG' ? '#DC2626' : '#475569'
+                        }}
+                      >
+                        🔴 Non-Veg
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Spiciness Level */}
+                  <div>
+                    <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#334155', marginBottom: '8px' }}>
+                      Taste & Spiciness
+                    </label>
+                    <div style={{ display: 'flex', gap: '6px' }}>
+                      {(['NONE', 'MILD', 'MEDIUM', 'HOT'] as const).map(lvl => (
+                        <button
+                          key={lvl}
+                          type="button"
+                          onClick={() => setEditSpiceLevel(lvl)}
+                          style={{
+                            flex: 1,
+                            padding: '8px 6px',
+                            borderRadius: '8px',
+                            fontSize: '11px',
+                            fontWeight: 700,
+                            cursor: 'pointer',
+                            border: editSpiceLevel === lvl ? '2px solid #E11D48' : '1px solid #CBD5E1',
+                            backgroundColor: editSpiceLevel === lvl ? '#FFE4E6' : '#FFFFFF',
+                            color: editSpiceLevel === lvl ? '#BE123C' : '#475569'
+                          }}
+                        >
+                          {lvl === 'NONE' ? '🌱 None' : lvl === 'MILD' ? '🌶️ Mild' : lvl === 'MEDIUM' ? '🌶️🌶️ Med' : '🌶️🌶️🌶️ Hot'}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Popular Tags Chips */}
+                <div style={{ marginTop: '14px' }}>
+                  <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#334155', marginBottom: '6px' }}>
+                    Menu Badges & Merchandising Tags
                   </label>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', cursor: 'pointer' }}>
-                    <input
-                      type="radio"
-                      name="editIsVeg"
-                      checked={editIsVeg === false}
-                      onChange={() => setEditIsVeg(false)}
-                    />
-                    <span style={{ color: '#DC2626', fontWeight: 700 }}>● Non-Veg</span>
-                  </label>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                    {POPULAR_TAG_OPTIONS.map(tag => {
+                      const active = editTags.includes(tag);
+                      return (
+                        <button
+                          key={tag}
+                          type="button"
+                          onClick={() => toggleTag(tag, true)}
+                          style={{
+                            padding: '4px 10px',
+                            borderRadius: '20px',
+                            fontSize: '11px',
+                            fontWeight: 600,
+                            cursor: 'pointer',
+                            border: active ? '1.5px solid #D97706' : '1px solid #CBD5E1',
+                            backgroundColor: active ? '#FEF3C7' : '#FFFFFF',
+                            color: active ? '#92400E' : '#64748B'
+                          }}
+                        >
+                          {active ? '✓ ' : '+ '}{tag}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
               </div>
 
-              <div style={{ marginBottom: '20px' }}>
-                <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#334155', marginBottom: '4px' }}>
-                  Description
-                </label>
-                <textarea
-                  rows={2}
-                  value={editDescription}
-                  onChange={(e) => setEditDescription(e.target.value)}
-                  style={{ width: '100%', padding: '9px 12px', borderRadius: '6px', border: '1px solid #CBD5E1', fontSize: '13px' }}
-                />
+              {/* Section: Portions & Variants (Half / Full, Regular / Large) */}
+              <div style={{ padding: '16px', backgroundColor: '#F8FAFC', borderRadius: '12px', border: '1px solid #E2E8F0', marginBottom: '20px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px', flexWrap: 'wrap', gap: '8px' }}>
+                  <div>
+                    <h3 style={{ margin: 0, fontSize: '13px', fontWeight: 800, color: '#0F172A' }}>
+                      Portions & Variants (Half / Full, Sizes)
+                    </h3>
+                    <p style={{ margin: '2px 0 0 0', fontSize: '11px', color: '#64748B' }}>
+                      Offer customer options like Half vs Full plate or Small vs Large portion with custom prices.
+                    </p>
+                  </div>
+                  <div style={{ display: 'flex', gap: '6px' }}>
+                    <button
+                      type="button"
+                      onClick={() => applyHalfFullPreset(true, editPrice)}
+                      style={{ padding: '4px 8px', borderRadius: '6px', fontSize: '11px', fontWeight: 700, backgroundColor: '#FEF3C7', color: '#B45309', border: '1px solid #FCD34D', cursor: 'pointer' }}
+                    >
+                      + Half / Full
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => applyRegularLargePreset(true, editPrice)}
+                      style={{ padding: '4px 8px', borderRadius: '6px', fontSize: '11px', fontWeight: 700, backgroundColor: '#E0E7FF', color: '#4338CA', border: '1px solid #C7D2FE', cursor: 'pointer' }}
+                    >
+                      + Reg / Large
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => addEmptyVariant(true)}
+                      style={{ padding: '4px 8px', borderRadius: '6px', fontSize: '11px', fontWeight: 700, backgroundColor: '#FFFFFF', color: '#0F172A', border: '1px solid #CBD5E1', cursor: 'pointer' }}
+                    >
+                      + Custom Variant
+                    </button>
+                  </div>
+                </div>
+
+                {editVariants.length === 0 ? (
+                  <div style={{ padding: '14px', textAlign: 'center', backgroundColor: '#FFFFFF', borderRadius: '8px', border: '1px dashed #CBD5E1', color: '#64748B', fontSize: '12px' }}>
+                    Single portion dish. Base price <strong>₹{editPrice || 0}</strong> applies. Click &quot;+ Half / Full&quot; above to add portion variants.
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    {editVariants.map((v, idx) => (
+                      <div key={idx} style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                        <input
+                          type="text"
+                          placeholder="e.g. Half, Full, 250ml"
+                          value={v.name}
+                          onChange={(e) => updateVariantRow(idx, 'name', e.target.value, true)}
+                          style={{ flex: 2, padding: '8px 10px', borderRadius: '6px', border: '1px solid #CBD5E1', fontSize: '12px' }}
+                        />
+                        <div style={{ flex: 1, display: 'flex', alignItems: 'center', position: 'relative' }}>
+                          <span style={{ position: 'absolute', left: '8px', color: '#64748B', fontSize: '12px' }}>₹</span>
+                          <input
+                            type="number"
+                            placeholder="Price"
+                            value={v.price}
+                            onChange={(e) => updateVariantRow(idx, 'price', e.target.value, true)}
+                            style={{ width: '100%', padding: '8px 10px 8px 20px', borderRadius: '6px', border: '1px solid #CBD5E1', fontSize: '12px' }}
+                          />
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => removeVariant(idx, true)}
+                          style={{ background: '#FEE2E2', border: 'none', color: '#DC2626', width: '28px', height: '28px', borderRadius: '6px', cursor: 'pointer', fontWeight: 700 }}
+                          title="Remove variant"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
-              <div style={{ display: 'flex', gap: '10px' }}>
+              {/* Action Buttons */}
+              <div style={{ display: 'flex', gap: '12px', marginTop: '16px' }}>
                 <button
                   type="button"
                   onClick={() => setShowEditModal(false)}
-                  style={{ flex: 1, padding: '10px', backgroundColor: '#F1F5F9', border: 'none', borderRadius: '6px', fontSize: '13px', fontWeight: 600, color: '#475569', cursor: 'pointer' }}
+                  style={{ flex: 1, padding: '12px', backgroundColor: '#F1F5F9', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, color: '#475569', cursor: 'pointer' }}
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  disabled={editSaving}
-                  style={{ flex: 2, padding: '10px', backgroundColor: 'var(--cw-color-primary)', color: '#FFFFFF', border: 'none', borderRadius: '6px', fontSize: '13px', fontWeight: 700, cursor: editSaving ? 'not-allowed' : 'pointer' }}
+                  disabled={editSaving || editImageUploading}
+                  style={{ flex: 2, padding: '12px', backgroundColor: 'var(--cw-color-primary)', color: '#FFFFFF', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 700, cursor: (editSaving || editImageUploading) ? 'not-allowed' : 'pointer' }}
                 >
-                  {editSaving ? 'Updating...' : 'Save Changes'}
+                  {editImageUploading ? 'Uploading WebP Photo...' : editSaving ? 'Updating...' : 'Save & Sync Changes'}
                 </button>
               </div>
             </form>
@@ -850,7 +1716,9 @@ export default function AdminMenuPage() {
         </div>
       )}
 
-      {/* Add Category Modal */}
+      {/* ========================================================================= */}
+      {/* ADD CATEGORY MODAL                                                         */}
+      {/* ========================================================================= */}
       {showAddCategoryModal && (
         <div
           style={{

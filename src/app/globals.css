@@ -46,3 +46,32 @@ h1, h2, h3, h4 {
   color: var(--cw-color-text-main);
   font-weight: 700;
 }
+
+/* Responsive Table and Container Utilities */
+.table-responsive {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+@media (max-width: 768px) {
+  .admin-sidebar-desktop {
+    display: none !important;
+  }
+  .admin-header-title {
+    font-size: 15px !important;
+  }
+  .admin-main-content {
+    padding: 12px !important;
+  }
+}
+
+@media (min-width: 769px) {
+  .admin-sidebar-mobile-drawer {
+    display: none !important;
+  }
+  .admin-mobile-menu-btn {
+    display: none !important;
+  }
+}
+

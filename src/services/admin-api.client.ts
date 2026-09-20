@@ -67,6 +67,14 @@ export interface CateringLeadDto {
   createdAt: string;
 }
 
+export interface MenuItemVariantDto {
+  id?: string;
+  menu_item_id?: string;
+  name: string;
+  price: number;
+  is_available?: boolean;
+}
+
 export interface AdminMenuItemDto {
   id: string;
   category_id: string;
@@ -75,8 +83,14 @@ export interface AdminMenuItemDto {
   description: string | null;
   base_price: number;
   is_veg: boolean;
+  is_egg?: boolean;
+  spice_level?: string;
+  tags?: string[];
   image_path: string | null;
   is_available: boolean;
+  variants?: MenuItemVariantDto[];
+  created_at?: string;
+  updated_at?: string;
 }
 
 export interface CategoryDto {
@@ -510,15 +524,62 @@ export async function fetchCategories(): Promise<CategoryDto[]> {
 }
 
 /**
- * Create new menu item (Admin / Orders staff)
+ * Resolves media paths (Supabase public storage or backend proxy)
+ */
+export function resolveMediaUrl(path: string | null | undefined): string {
+  if (!path) return '';
+  if (path.startsWith('http://') || path.startsWith('https://') || path.startsWith('data:')) {
+    return path;
+  }
+  if (path.startsWith('/')) {
+    return `${BACKEND_URL}${path}`;
+  }
+  // Default to backend media proxy or direct public storage
+  return `${BACKEND_URL}/api/v1/media/${path}`;
+}
+
+/**
+ * Upload compressed WebP image to Supabase Storage (Admin / Staff)
+ */
+export async function uploadMenuImage(
+  imageBase64: string,
+  fileName: string,
+  folder = 'items'
+): Promise<{ imagePath: string; storagePath: string; publicUrl: string }> {
+  const res = await authFetch(`${BACKEND_URL}/api/v1/media/upload`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      imageBase64,
+      fileName,
+      folder,
+      bucket: 'menu'
+    })
+  });
+
+  const json = await res.json();
+  if (!res.ok || !json.success) {
+    throw new Error(json.message || 'Image upload to Supabase Storage failed');
+  }
+
+  return json.data;
+}
+
+/**
+ * Create new menu item with variants, spicy level, tags, and image (Admin / Orders staff)
  */
 export async function createAdminMenuItem(payload: {
   name: string;
   category_id: string;
   base_price: number;
   is_veg: boolean;
+  is_egg?: boolean;
+  spice_level?: string;
+  tags?: string[];
   description?: string;
+  image_path?: string | null;
   is_available?: boolean;
+  variants?: MenuItemVariantDto[];
 }): Promise<AdminMenuItemDto> {
   const res = await authFetch(`${BACKEND_URL}/api/v1/menu/items`, {
     method: 'POST',
@@ -534,7 +595,7 @@ export async function createAdminMenuItem(payload: {
 }
 
 /**
- * Update existing menu item (Admin / Orders staff)
+ * Update existing menu item with variants, spicy level, tags, and image (Admin / Orders staff)
  */
 export async function updateAdminMenuItem(
   id: string,
@@ -543,8 +604,13 @@ export async function updateAdminMenuItem(
     category_id: string;
     base_price: number;
     is_veg: boolean;
+    is_egg: boolean;
+    spice_level: string;
+    tags: string[];
     description: string;
+    image_path: string | null;
     is_available: boolean;
+    variants: MenuItemVariantDto[];
   }>
 ): Promise<AdminMenuItemDto> {
   const res = await authFetch(`${BACKEND_URL}/api/v1/menu/items/${encodeURIComponent(id)}`, {
@@ -685,3 +751,217 @@ export async function createAdminCategory(input: {
   const data = await res.json();
   return data.data;
 }
+
+export interface ClientOfficeDto {
+  id: string;
+  name: string;
+  phone: string;
+  company_name?: string;
+  floor_unit?: string;
+  notes?: string;
+  client_pin?: string;
+  total_consumption: number;
+  total_payments: number;
+  balance_due: number;
+  last_entry_date?: string;
+  created_at: string;
+}
+
+export interface ClientStatementDto {
+  office: ClientOfficeDto;
+  entries: Array<{
+    id: string;
+    date: string;
+    item_name: string;
+    quantity: number;
+    unit_price: number;
+    total_amount: number;
+    notes?: string;
+  }>;
+  payments: Array<{
+    id: string;
+    date: string;
+    amount: number;
+    payment_mode: string;
+    notes?: string;
+  }>;
+  totalConsumption: number;
+  totalPayments: number;
+  balanceDue: number;
+  whatsappText: string;
+}
+
+/**
+ * Fetch all registered corporate / khata clients with PINs and balances
+ */
+export async function fetchClients(): Promise<ClientOfficeDto[]> {
+  const res = await authFetch(`${BACKEND_URL}/api/v1/khata/offices`);
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.message || 'Failed to fetch client accounts');
+  }
+  const json = await res.json();
+  return json.data || [];
+}
+
+/**
+ * Create a new corporate / regular client account with PIN
+ */
+export async function createClient(payload: {
+  name: string;
+  phone: string;
+  company_name?: string;
+  floor_unit?: string;
+  notes?: string;
+  client_pin?: string;
+}): Promise<ClientOfficeDto> {
+  const res = await authFetch(`${BACKEND_URL}/api/v1/khata/offices`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.message || 'Failed to create client account');
+  }
+  const json = await res.json();
+  return json.data;
+}
+
+/**
+ * Regenerate or set custom access PIN for a client
+ */
+export async function regenerateClientPin(clientId: string, pin?: string): Promise<string> {
+  const res = await authFetch(`${BACKEND_URL}/api/v1/khata/offices/${encodeURIComponent(clientId)}/pin`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ pin })
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.message || 'Failed to set client PIN');
+  }
+  const json = await res.json();
+  return json.data.pin;
+}
+
+/**
+ * Fetch complete billing statement (consumptions, payments, balance due) for a client
+ */
+export async function fetchClientStatement(clientId: string): Promise<ClientStatementDto> {
+  const res = await authFetch(`${BACKEND_URL}/api/v1/khata/statement/${encodeURIComponent(clientId)}`);
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.message || 'Failed to fetch client statement');
+  }
+  const json = await res.json();
+  return json.data;
+}
+
+/**
+ * Record a payment from a client account
+ */
+export async function addClientPayment(payload: {
+  office_id: string;
+  amount: number;
+  payment_mode?: string;
+  date?: string;
+  notes?: string;
+}): Promise<any> {
+  const res = await authFetch(`${BACKEND_URL}/api/v1/khata/payments`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.message || 'Failed to record payment');
+  }
+  const json = await res.json();
+  return json.data;
+}
+
+/**
+ * Add a consumption / bill entry for a client
+ */
+export async function addClientEntry(payload: {
+  office_id: string;
+  item_name: string;
+  quantity: number;
+  unit_price: number;
+  date?: string;
+  notes?: string;
+}): Promise<any> {
+  const res = await authFetch(`${BACKEND_URL}/api/v1/khata/entries`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.message || 'Failed to add bill entry');
+  }
+  const json = await res.json();
+  return json.data;
+}
+
+/**
+ * Update client details
+ */
+export async function updateClient(
+  clientId: string,
+  payload: { name?: string; phone?: string; company_name?: string; floor_unit?: string; notes?: string }
+): Promise<ClientOfficeDto> {
+  const res = await authFetch(`${BACKEND_URL}/api/v1/khata/offices/${encodeURIComponent(clientId)}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.message || 'Failed to update client');
+  }
+  const json = await res.json();
+  return json.data;
+}
+
+/**
+ * Delete client account
+ */
+export async function deleteClient(clientId: string): Promise<void> {
+  const res = await authFetch(`${BACKEND_URL}/api/v1/khata/offices/${encodeURIComponent(clientId)}`, {
+    method: 'DELETE'
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.message || 'Failed to delete client');
+  }
+}
+
+/**
+ * Delete a khata entry
+ */
+export async function deleteClientEntry(entryId: string): Promise<void> {
+  const res = await authFetch(`${BACKEND_URL}/api/v1/khata/entries/${encodeURIComponent(entryId)}`, {
+    method: 'DELETE'
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.message || 'Failed to delete entry');
+  }
+}
+
+/**
+ * Delete a payment record
+ */
+export async function deleteClientPayment(paymentId: string): Promise<void> {
+  const res = await authFetch(`${BACKEND_URL}/api/v1/khata/payments/${encodeURIComponent(paymentId)}`, {
+    method: 'DELETE'
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.message || 'Failed to delete payment');
+  }
+}
+
+

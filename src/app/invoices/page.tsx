@@ -61,14 +61,21 @@ export default function AdminInvoicesPage() {
   }, [statusFilter]);
 
   const filteredInvoices = invoices.filter((inv) => {
-    const query = searchQuery.toLowerCase().trim();
-    if (!query) return true;
-    return (
-      inv.invoice_number.toLowerCase().includes(query) ||
-      (inv.corporate_clients?.company_name && inv.corporate_clients.company_name.toLowerCase().includes(query)) ||
-      (inv.department && inv.department.toLowerCase().includes(query)) ||
-      (inv.orders?.customer_name && inv.orders.customer_name.toLowerCase().includes(query))
-    );
+    const rawQuery = searchQuery.toLowerCase().trim();
+    const keywords = rawQuery ? rawQuery.split(/\s+/).filter(Boolean) : [];
+    if (keywords.length === 0) return true;
+
+    const searchable = [
+      inv.invoice_number,
+      inv.corporate_clients?.company_name || '',
+      inv.department || '',
+      inv.orders?.customer_name || '',
+      inv.invoice_type || '',
+      inv.status || '',
+      inv.grand_total?.toString() || ''
+    ].join(' ').toLowerCase();
+
+    return keywords.every((kw) => searchable.includes(kw));
   });
 
   const handleOpenViewBill = async (invoiceId: string) => {
@@ -261,7 +268,7 @@ export default function AdminInvoicesPage() {
 
         <input
           type="text"
-          placeholder="Search by invoice, company, department..."
+          placeholder="Search invoices by number, client, company, department, status, or keywords..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           style={{

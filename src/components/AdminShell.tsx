@@ -106,6 +106,7 @@ export default function AdminShell({ children }: AdminShellProps) {
     ? [{ label: 'Menu Management', href: '/menu', icon: '🍲' }]
     : [
         { label: 'Dashboard', href: '/', icon: '📊' },
+        { label: 'Clients & Khata PINs', href: '/clients', icon: '👥' },
         { label: 'Invoices', href: '/invoices', icon: '🧾' },
         { label: 'Customer Ledgers', href: '/ledger', icon: '📑' },
         { label: 'Statements & Sales', href: '/statements', icon: '📈' },
@@ -118,6 +119,7 @@ export default function AdminShell({ children }: AdminShellProps) {
 
   const getPageTitle = (path: string) => {
     if (path === '/') return 'Operations Dashboard';
+    if (path.startsWith('/clients')) return 'Client Accounts & Access PINs';
     if (path.startsWith('/invoices')) return 'Invoices & Billing History';
     if (path.startsWith('/ledger')) return 'Customer & Corporate Ledgers';
     if (path.startsWith('/statements')) return 'Sales Statements & Registers';
@@ -129,10 +131,17 @@ export default function AdminShell({ children }: AdminShellProps) {
     return 'Operations Hub';
   };
 
+  const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
+
+  useEffect(() => {
+    setMobileDrawerOpen(false);
+  }, [pathname]);
+
   return (
     <div style={{ display: 'flex', minHeight: '100vh', width: '100%', backgroundColor: '#F4F6F8' }}>
-      {/* Left Dark Sidebar */}
+      {/* Left Dark Sidebar (Desktop stationary) */}
       <aside
+        className="admin-sidebar-desktop"
         style={{
           width: '240px',
           backgroundColor: '#1E2328',
@@ -155,7 +164,7 @@ export default function AdminShell({ children }: AdminShellProps) {
         >
           <img
             src="/assets/chaiwale-logo.jpeg"
-            alt="Chaiwale"
+            alt="Admin Logo"
             style={{ height: '36px', width: '36px', borderRadius: '6px', objectFit: 'cover' }}
           />
           <div>
@@ -163,14 +172,14 @@ export default function AdminShell({ children }: AdminShellProps) {
               style={{
                 fontFamily: 'var(--cw-font-heading)',
                 color: '#FFFFFF',
-                fontSize: '16px',
+                fontSize: '18px',
+                fontWeight: 800,
                 letterSpacing: '0.04em',
                 display: 'block'
               }}
             >
-              CHAIWALE
+              Admin
             </strong>
-            <span style={{ fontSize: '11px', color: '#94A3B8' }}>Operations Hub</span>
           </div>
         </div>
 
@@ -210,6 +219,90 @@ export default function AdminShell({ children }: AdminShellProps) {
         </div>
       </aside>
 
+      {/* Mobile Off-Canvas Drawer */}
+      {mobileDrawerOpen && (
+        <div
+          className="admin-sidebar-mobile-drawer"
+          onClick={() => setMobileDrawerOpen(false)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 9999,
+            backgroundColor: 'rgba(0, 0, 0, 0.65)',
+            backdropFilter: 'blur(4px)',
+            display: 'flex'
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: '260px',
+              maxWidth: '80%',
+              backgroundColor: '#1E2328',
+              color: '#CBD5E1',
+              height: '100%',
+              display: 'flex',
+              flexDirection: 'column',
+              boxShadow: '4px 0 24px rgba(0,0,0,0.4)',
+              animation: 'slideInLeft 0.2s ease-out'
+            }}
+          >
+            <div
+              style={{
+                padding: '16px 20px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                borderBottom: '1px solid #2D3748'
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <img
+                  src="/assets/chaiwale-logo.jpeg"
+                  alt="Admin Logo"
+                  style={{ height: '32px', width: '32px', borderRadius: '6px', objectFit: 'cover' }}
+                />
+                <strong style={{ color: '#FFFFFF', fontSize: '16px', fontWeight: 800 }}>Admin</strong>
+              </div>
+              <button
+                onClick={() => setMobileDrawerOpen(false)}
+                style={{ background: 'none', border: 'none', color: '#94A3B8', fontSize: '18px', cursor: 'pointer' }}
+              >
+                ✕
+              </button>
+            </div>
+
+            <nav style={{ padding: '14px 10px', display: 'flex', flexDirection: 'column', gap: '4px', flex: 1, overflowY: 'auto' }}>
+              {navItems.map((item, idx) => {
+                const isActive = item.href === '/' ? pathname === '/' : pathname.startsWith(item.href);
+                return (
+                  <Link
+                    key={idx}
+                    href={item.href}
+                    onClick={() => setMobileDrawerOpen(false)}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '10px',
+                      padding: '10px 14px',
+                      borderRadius: '6px',
+                      fontSize: '13px',
+                      fontWeight: 600,
+                      color: isActive ? '#FFFFFF' : '#94A3B8',
+                      backgroundColor: isActive ? '#2D3748' : 'transparent',
+                      textDecoration: 'none'
+                    }}
+                  >
+                    <span style={{ fontSize: '16px' }}>{item.icon}</span>
+                    <span>{item.label}</span>
+                  </Link>
+                );
+              })}
+            </nav>
+          </div>
+        </div>
+      )}
+
       {/* Main Dashboard Canvas */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
         {/* Top Operational Bar */}
@@ -221,29 +314,57 @@ export default function AdminShell({ children }: AdminShellProps) {
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            padding: '0 24px',
+            padding: '0 20px',
             boxShadow: '0 1px 2px rgba(0,0,0,0.03)'
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{ fontSize: '18px', fontWeight: 700, fontFamily: 'var(--cw-font-heading)', color: '#1E293B' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <button
+              type="button"
+              className="admin-mobile-menu-btn"
+              onClick={() => setMobileDrawerOpen(true)}
+              aria-label="Open mobile menu"
+              style={{
+                background: '#F1F5F9',
+                border: '1px solid #CBD5E1',
+                borderRadius: '6px',
+                padding: '6px 10px',
+                fontSize: '15px',
+                cursor: 'pointer',
+                color: '#334155'
+              }}
+            >
+              ☰
+            </button>
+            <span
+              className="admin-header-title"
+              style={{ fontSize: '18px', fontWeight: 700, fontFamily: 'var(--cw-font-heading)', color: '#1E293B' }}
+            >
               {getPageTitle(pathname)}
             </span>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '18px', fontSize: '13px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '14px', fontSize: '13px' }}>
             <span style={{ color: 'var(--cw-color-success)', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
               <span style={{ width: '8px', height: '8px', backgroundColor: '#10B981', borderRadius: '50%', display: 'inline-block' }} />
-              Operational Live
+              Live
             </span>
             <AdminHeaderUser />
           </div>
         </header>
 
-        <main style={{ padding: '24px', flex: 1, overflowY: 'auto' }}>
+        <main className="admin-main-content" style={{ padding: '24px', flex: 1, overflowY: 'auto' }}>
           {children}
         </main>
       </div>
+
+      <style jsx global>{`
+        @keyframes slideInLeft {
+          from { transform: translateX(-100%); }
+          to { transform: translateX(0); }
+        }
+      `}</style>
     </div>
   );
 }
+
