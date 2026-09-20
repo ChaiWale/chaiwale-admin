@@ -184,7 +184,7 @@ export default function AdminOrdersPage() {
       >
         {/* Status Pills */}
         <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-          {['ALL', 'CONFIRMED', 'PREPARING', 'OUT_FOR_DELIVERY', 'COMPLETED', 'CANCELLED'].map(status => (
+          {['ALL', 'NEW', 'CONFIRMED', 'PREPARING', 'READY', 'OUT_FOR_DELIVERY', 'COMPLETED', 'CANCELLED'].map(status => (
             <button
               key={status}
               onClick={() => setStatusFilter(status)}
@@ -384,6 +384,59 @@ export default function AdminOrdersPage() {
                       {/* Status Action Selector */}
                       <td style={{ padding: '16px' }}>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                          {order.status === 'NEW' && (
+                            <div style={{ display: 'flex', gap: '6px', marginBottom: '2px' }}>
+                              <button
+                                onClick={() => handleStatusChange(order.id, 'CONFIRMED')}
+                                disabled={isUpdating}
+                                style={{
+                                  flex: 1,
+                                  padding: '6px 10px',
+                                  backgroundColor: '#16A34A',
+                                  color: '#FFFFFF',
+                                  border: 'none',
+                                  borderRadius: '6px',
+                                  fontSize: '11px',
+                                  fontWeight: 700,
+                                  cursor: isUpdating ? 'not-allowed' : 'pointer',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  gap: '4px'
+                                }}
+                                title="Accept this customer order"
+                              >
+                                ✓ Accept
+                              </button>
+                              <button
+                                onClick={() => {
+                                  if (confirm(`Reject order #${order.order_number}? This will cancel the order.`)) {
+                                    handleStatusChange(order.id, 'CANCELLED');
+                                  }
+                                }}
+                                disabled={isUpdating}
+                                style={{
+                                  flex: 1,
+                                  padding: '6px 10px',
+                                  backgroundColor: '#DC2626',
+                                  color: '#FFFFFF',
+                                  border: 'none',
+                                  borderRadius: '6px',
+                                  fontSize: '11px',
+                                  fontWeight: 700,
+                                  cursor: isUpdating ? 'not-allowed' : 'pointer',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  gap: '4px'
+                                }}
+                                title="Reject / Cancel this order"
+                              >
+                                ✕ Reject
+                              </button>
+                            </div>
+                          )}
+
                           <select
                             value={order.status}
                             disabled={isUpdating}

@@ -257,6 +257,7 @@ export default function AdminDashboardPage() {
 
       {/* Grid: Sales Overview Chart (Left) & Recent Orders (Right) */}
       <div
+        className="admin-dashboard-grid"
         style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))',

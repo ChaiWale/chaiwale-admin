@@ -18,6 +18,11 @@ export default function AdminShell({ children }: AdminShellProps) {
   const isLoginPage = pathname === '/login';
 
   const [currentUser, setCurrentUser] = useState<any>(null);
+  const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
+
+  useEffect(() => {
+    setMobileDrawerOpen(false);
+  }, [pathname]);
 
   useEffect(() => {
     const token = getStoredAuthToken();
@@ -130,12 +135,6 @@ export default function AdminShell({ children }: AdminShellProps) {
     if (path.startsWith('/settings')) return 'System & Store Settings';
     return 'Operations Hub';
   };
-
-  const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
-
-  useEffect(() => {
-    setMobileDrawerOpen(false);
-  }, [pathname]);
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh', width: '100%', backgroundColor: '#F4F6F8' }}>
