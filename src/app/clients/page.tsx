@@ -608,7 +608,7 @@ export default function AdminClientsPage() {
             </span>
             <input
               type="text"
-              placeholder="Search by client name, mobile, company, floor, PIN, or keywords..."
+              placeholder="Search by client name, mobile, building, office, PIN..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               style={{
@@ -689,7 +689,7 @@ export default function AdminClientsPage() {
             <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '14px' }}>
               <thead>
                 <tr style={{ backgroundColor: '#F8FAFC', borderBottom: '1px solid #E2E8F0', color: '#475569', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                  <th style={{ padding: '14px 20px', fontWeight: 600 }}>Client & Company</th>
+                  <th style={{ padding: '14px 20px', fontWeight: 600 }}>Client & Location (Building / Office)</th>
                   <th style={{ padding: '14px 16px', fontWeight: 600 }}>Mobile / WhatsApp</th>
                   <th style={{ padding: '14px 16px', fontWeight: 600, textAlign: 'center' }}>Generated Access PIN</th>
                   <th style={{ padding: '14px 16px', fontWeight: 600, textAlign: 'right' }}>Total Billed</th>
@@ -1475,15 +1475,15 @@ export default function AdminClientsPage() {
                   />
                 </div>
 
-                {/* Company Name & Floor */}
+                {/* Building Name & Office Detail */}
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                   <div>
                     <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#334155', marginBottom: '6px' }}>
-                      Company / Organization
+                      Building Name
                     </label>
                     <input
                       type="text"
-                      placeholder="e.g. TCS / Tech Mahindra"
+                      placeholder="e.g. Vardhman Grand Plaza"
                       value={clientForm.company_name}
                       onChange={(e) => setClientForm({ ...clientForm, company_name: e.target.value })}
                       style={{
@@ -1499,11 +1499,11 @@ export default function AdminClientsPage() {
 
                   <div>
                     <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#334155', marginBottom: '6px' }}>
-                      Floor / Unit / Cabin
+                      Office Detail
                     </label>
                     <input
                       type="text"
-                      placeholder="e.g. Floor 3, Bay B"
+                      placeholder="e.g. Office 302, Shop G-12"
                       value={clientForm.floor_unit}
                       onChange={(e) => setClientForm({ ...clientForm, floor_unit: e.target.value })}
                       style={{
