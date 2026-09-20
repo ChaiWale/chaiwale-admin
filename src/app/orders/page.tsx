@@ -1,8 +1,9 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { fetchRecentOrders, updateOrderStatus, verifyOrderPayment, fetchKOTPayload, AdminOrderDto } from '../../services/admin-api.client';
+import { fetchRecentOrders, updateOrderStatus, verifyOrderPayment, AdminOrderDto } from '../../services/admin-api.client';
 import { buildWhatsAppUrl, WhatsAppTemplates } from '../../utils/whatsapp';
+import { ThermalReceiptModal, ThermalReceiptData } from '../../components/ThermalReceiptModal';
 
 export default function AdminOrdersPage() {
   const [orders, setOrders] = useState<AdminOrderDto[]>([]);
@@ -12,7 +13,8 @@ export default function AdminOrdersPage() {
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [actionSuccess, setActionSuccess] = useState<string | null>(null);
-  const [kotPreview, setKotPreview] = useState<{ orderNumber: string; base64: string } | null>(null);
+  const [receiptModalOpen, setReceiptModalOpen] = useState(false);
+  const [receiptModalData, setReceiptModalData] = useState<ThermalReceiptData | null>(null);
 
   const loadOrders = async () => {
     setLoading(true);
@@ -68,13 +70,30 @@ export default function AdminOrdersPage() {
     }
   };
 
-  const handlePrintKOT = async (order: AdminOrderDto) => {
-    try {
-      const base64 = await fetchKOTPayload(order.id);
-      setKotPreview({ orderNumber: order.order_number, base64 });
-    } catch (err: any) {
-      alert(`Failed to generate KOT: ${err.message}`);
-    }
+  const handleOpenReceiptModal = (order: AdminOrderDto, mode: 'CUSTOMER_BILL' | 'KOT') => {
+    const items = (order.items || []).map((i: any) => ({
+      name: i.item_name || i.name || 'Menu Item',
+      quantity: Number(i.quantity || 1),
+      unitPrice: Number(i.unit_price || 0),
+      lineTotal: Number(i.line_total || (Number(i.quantity || 1) * Number(i.unit_price || 0)))
+    }));
+
+    setReceiptModalData({
+      receiptType: mode,
+      orderNumber: order.order_number,
+      invoiceNumber: order.order_number,
+      date: order.created_at,
+      paymentMode: order.payment_mode || 'CASH',
+      customerName: order.customer_name || 'Counter Customer',
+      customerPhone: (order as any).customer_phone || '',
+      customerAddress: order.delivery_address || (order.order_type === 'DINE_IN' ? 'Table Order' : 'Takeaway Counter'),
+      items,
+      subtotal: Number(order.subtotal || order.grand_total || 0),
+      tax: Number(order.tax_amount || 0),
+      discount: Number(order.discount_amount || 0),
+      grandTotal: Number(order.grand_total || 0)
+    });
+    setReceiptModalOpen(true);
   };
 
   const getStatusBadge = (status: string) => {
@@ -482,18 +501,43 @@ export default function AdminOrdersPage() {
                             )}
 
                             <button
-                              onClick={() => handlePrintKOT(order)}
+                              onClick={() => handleOpenReceiptModal(order, 'CUSTOMER_BILL')}
                               style={{
                                 padding: '4px 8px',
-                                backgroundColor: '#F1F5F9',
-                                border: '1px solid #CBD5E1',
+                                backgroundColor: '#166534',
+                                color: '#FFFFFF',
+                                border: 'none',
                                 borderRadius: 'var(--cw-radius-md)',
                                 fontSize: '11px',
-                                fontWeight: 600,
-                                cursor: 'pointer'
+                                fontWeight: 700,
+                                cursor: 'pointer',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '3px'
                               }}
+                              title="Print / View Customer Bill"
                             >
-                              🖨️ KOT
+                              🧾 Bill
+                            </button>
+
+                            <button
+                              onClick={() => handleOpenReceiptModal(order, 'KOT')}
+                              style={{
+                                padding: '4px 8px',
+                                backgroundColor: '#334155',
+                                color: '#FFFFFF',
+                                border: 'none',
+                                borderRadius: 'var(--cw-radius-md)',
+                                fontSize: '11px',
+                                fontWeight: 700,
+                                cursor: 'pointer',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '3px'
+                              }}
+                              title="Print / View Kitchen Order Ticket (KOT)"
+                            >
+                              🍳 KOT
                             </button>
 
                             {/* WhatsApp Chat — only renders when customer has a valid phone */}
@@ -570,100 +614,12 @@ export default function AdminOrdersPage() {
         )}
       </div>
 
-      {/* KOT Thermal Print Modal */}
-      {kotPreview && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            backgroundColor: 'rgba(0,0,0,0.5)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 1000,
-            padding: '20px'
-          }}
-        >
-          <div
-            style={{
-              backgroundColor: '#FFFFFF',
-              borderRadius: 'var(--cw-radius-lg)',
-              maxWidth: '520px',
-              width: '100%',
-              padding: '24px',
-              boxShadow: '0 20px 25px -5px rgba(0,0,0,0.2)'
-            }}
-          >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
-              <h3 style={{ fontSize: '18px', fontWeight: 800, color: '#0F172A' }}>
-                🖨️ ESC/POS Thermal KOT #{kotPreview.orderNumber}
-              </h3>
-              <button
-                onClick={() => setKotPreview(null)}
-                style={{ background: 'none', border: 'none', fontSize: '18px', cursor: 'pointer' }}
-              >
-                ✕
-              </button>
-            </div>
-            <div style={{ padding: '12px', backgroundColor: '#FEF3C7', border: '1px solid #FCD34D', borderRadius: 'var(--cw-radius-md)', fontSize: '12px', color: '#92400E', marginBottom: '14px' }}>
-              <strong>KOT Rule Verification:</strong> Generated strictly with NO prices/totals for kitchen staff, 48-column thermal layout, cut-feed command, and item quantities.
-            </div>
-            <div style={{ marginBottom: '16px' }}>
-              <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: '#64748B', marginBottom: '4px' }}>
-                ESC/POS Base64 Byte Stream (Ready for Network/Bluetooth Thermal Printer):
-              </label>
-              <textarea
-                readOnly
-                value={kotPreview.base64}
-                rows={5}
-                style={{
-                  width: '100%',
-                  fontFamily: 'monospace',
-                  fontSize: '11px',
-                  padding: '8px',
-                  borderRadius: '4px',
-                  border: '1px solid #CBD5E1',
-                  backgroundColor: '#F8FAFC'
-                }}
-              />
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
-              <button
-                onClick={() => {
-                  navigator.clipboard.writeText(kotPreview.base64);
-                  alert('Copied ESC/POS Base64 binary payload to clipboard!');
-                }}
-                style={{
-                  padding: '8px 14px',
-                  backgroundColor: 'var(--cw-color-primary)',
-                  color: '#FFFFFF',
-                  border: 'none',
-                  borderRadius: 'var(--cw-radius-md)',
-                  fontSize: '12px',
-                  fontWeight: 700,
-                  cursor: 'pointer'
-                }}
-              >
-                📋 Copy ESC/POS Stream
-              </button>
-              <button
-                onClick={() => setKotPreview(null)}
-                style={{
-                  padding: '8px 14px',
-                  backgroundColor: '#F1F5F9',
-                  border: '1px solid #CBD5E1',
-                  borderRadius: 'var(--cw-radius-md)',
-                  fontSize: '12px',
-                  fontWeight: 600,
-                  cursor: 'pointer'
-                }}
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* 3D Animated Thermal Receipt Printer & KOT Modal */}
+      <ThermalReceiptModal
+        isOpen={receiptModalOpen}
+        onClose={() => setReceiptModalOpen(false)}
+        data={receiptModalData}
+      />
     </div>
   );
 }
