@@ -2,9 +2,9 @@
 
 import React, { useState, useEffect } from 'react';
 import {
-  fetchPromoBanners,
-  updatePromoBanners,
-  PromoBannerDto,
+  fetchHeroSlides,
+  updateHeroSlides,
+  HeroSlideDto,
   uploadMenuImage,
   resolveMediaUrl
 } from '../../services/admin-api.client';
@@ -42,16 +42,16 @@ const DEFAULT_SETTINGS: StoreSettingsState = {
 const STORAGE_KEY = 'chaiwale_admin_store_settings';
 
 export default function AdminSettingsPage() {
-  const [activeTab, setActiveTab] = useState<'store' | 'banners'>('store');
+  const [activeTab, setActiveTab] = useState<'store' | 'hero'>('store');
   const [settings, setSettings] = useState<StoreSettingsState>(DEFAULT_SETTINGS);
   const [savedFeedback, setSavedFeedback] = useState<string | null>(null);
 
-  // Homepage Promo Banners State
-  const [banners, setBanners] = useState<PromoBannerDto[]>([]);
-  const [loadingBanners, setLoadingBanners] = useState<boolean>(false);
-  const [savingBanners, setSavingBanners] = useState<boolean>(false);
-  const [bannerFeedback, setBannerFeedback] = useState<string | null>(null);
-  const [uploadingBannerIndex, setUploadingBannerIndex] = useState<number | null>(null);
+  // Homepage Hero Showcase State
+  const [heroSlides, setHeroSlides] = useState<HeroSlideDto[]>([]);
+  const [loadingHero, setLoadingHero] = useState<boolean>(false);
+  const [savingHero, setSavingHero] = useState<boolean>(false);
+  const [heroFeedback, setHeroFeedback] = useState<string | null>(null);
+  const [uploadingHeroIndex, setUploadingHeroIndex] = useState<number | null>(null);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -64,18 +64,18 @@ export default function AdminSettingsPage() {
         }
       }
     }
-    loadBanners();
+    loadHeroSlides();
   }, []);
 
-  const loadBanners = async () => {
-    setLoadingBanners(true);
+  const loadHeroSlides = async () => {
+    setLoadingHero(true);
     try {
-      const data = await fetchPromoBanners();
-      setBanners(data);
+      const data = await fetchHeroSlides();
+      setHeroSlides(data);
     } catch (err: any) {
-      console.error('Failed to load promo banners:', err);
+      console.error('Failed to load hero slides:', err);
     } finally {
-      setLoadingBanners(false);
+      setLoadingHero(false);
     }
   };
 
@@ -92,75 +92,61 @@ export default function AdminSettingsPage() {
     setTimeout(() => setSavedFeedback(null), 3500);
   };
 
-  // Banner Handlers
-  const handleBannerChange = (index: number, field: keyof PromoBannerDto, value: any) => {
-    setBanners((prev) => {
+  // Hero Showcase Handlers
+  const handleHeroSlideChange = (index: number, field: keyof HeroSlideDto, value: any) => {
+    setHeroSlides((prev) => {
       const copy = [...prev];
       copy[index] = { ...copy[index], [field]: value };
       return copy;
     });
   };
 
-  const handleAddBanner = () => {
-    const newBanner: PromoBannerDto = {
-      id: `banner-${Date.now()}`,
-      badge: 'Special Offer',
-      title: 'New Promotional Headline',
-      description: 'Describe the special feast, lunch package, or party discount here.',
-      image: '/assets/images/chai.jpg',
-      ctaText: 'Inquire Now',
-      ctaLink: '/catering',
-      whatsappNumber: '918800410441',
-      whatsappText: 'Hello Chaiwale, I am inquiring about this special promotion.',
-      theme: 'cream',
-      isActive: true,
-      order: banners.length + 1
-    };
-    setBanners((prev) => [...prev, newBanner]);
+  const handleHeroHighlightChange = (slideIndex: number, bulletIndex: number, value: string) => {
+    setHeroSlides((prev) => {
+      const copy = [...prev];
+      const highlights = Array.isArray(copy[slideIndex].highlights) ? [...copy[slideIndex].highlights] : ['', '', ''];
+      highlights[bulletIndex] = value;
+      copy[slideIndex] = { ...copy[slideIndex], highlights };
+      return copy;
+    });
   };
 
-  const handleDeleteBanner = (index: number) => {
-    if (window.confirm('Are you sure you want to remove this promotional banner from the homepage?')) {
-      setBanners((prev) => prev.filter((_, i) => i !== index));
-    }
-  };
-
-  const handleBannerImageUpload = async (index: number, file: File) => {
+  const handleHeroImageUpload = async (index: number, file: File) => {
     try {
-      setUploadingBannerIndex(index);
+      setUploadingHeroIndex(index);
       const reader = new FileReader();
       reader.onload = async () => {
         const base64 = reader.result as string;
         try {
-          const res = await uploadMenuImage(base64, file.name.replace(/\.[^/.]+$/, ''), 'banners');
+          const res = await uploadMenuImage(base64, file.name.replace(/\.[^/.]+$/, ''), 'hero');
           const uploadedUrl = res.publicUrl || res.imagePath;
-          handleBannerChange(index, 'image', uploadedUrl);
-          setBannerFeedback('✓ Banner image uploaded successfully!');
-          setTimeout(() => setBannerFeedback(null), 3000);
+          handleHeroSlideChange(index, 'image', uploadedUrl);
+          setHeroFeedback('✓ Hero slide image uploaded successfully to Supabase!');
+          setTimeout(() => setHeroFeedback(null), 3500);
         } catch (uploadErr: any) {
           alert(`Image upload error: ${uploadErr.message}`);
         } finally {
-          setUploadingBannerIndex(null);
+          setUploadingHeroIndex(null);
         }
       };
       reader.readAsDataURL(file);
     } catch (err: any) {
       alert(`Image processing error: ${err.message}`);
-      setUploadingBannerIndex(null);
+      setUploadingHeroIndex(null);
     }
   };
 
-  const handleSaveBanners = async () => {
-    setSavingBanners(true);
+  const handleSaveHeroSlides = async () => {
+    setSavingHero(true);
     try {
-      const updated = await updatePromoBanners(banners);
-      setBanners(updated);
-      setBannerFeedback('✓ All homepage promotional banners updated successfully!');
-      setTimeout(() => setBannerFeedback(null), 4000);
+      const updated = await updateHeroSlides(heroSlides);
+      setHeroSlides(updated);
+      setHeroFeedback('✓ All 5 homepage hero showcase slides updated successfully!');
+      setTimeout(() => setHeroFeedback(null), 4000);
     } catch (err: any) {
-      alert(`Failed to save banners: ${err.message}`);
+      alert(`Failed to save hero slides: ${err.message}`);
     } finally {
-      setSavingBanners(false);
+      setSavingHero(false);
     }
   };
 
@@ -170,12 +156,12 @@ export default function AdminSettingsPage() {
       <div style={{ marginBottom: '20px' }}>
         <h1 style={{ fontSize: '24px', fontWeight: 800, color: '#1E2328' }}>System & Store Settings</h1>
         <p style={{ fontSize: '13px', color: '#64748B', marginTop: '2px' }}>
-          Manage Chaiwale store profile, outlet operational timings, payment details, and homepage promotional banners
+          Manage Chaiwale store profile, outlet operational timings, payment details, promotional banners and animated hero slides
         </p>
       </div>
 
       {/* Tabs Navigation */}
-      <div style={{ display: 'flex', gap: '8px', marginBottom: '24px', borderBottom: '1px solid #E2E8F0', paddingBottom: '8px' }}>
+      <div style={{ display: 'flex', gap: '8px', marginBottom: '24px', borderBottom: '1px solid #E2E8F0', paddingBottom: '8px', flexWrap: 'wrap' }}>
         <button
           type="button"
           onClick={() => setActiveTab('store')}
@@ -198,7 +184,7 @@ export default function AdminSettingsPage() {
 
         <button
           type="button"
-          onClick={() => setActiveTab('banners')}
+          onClick={() => setActiveTab('hero')}
           style={{
             padding: '9px 18px',
             borderRadius: '8px',
@@ -206,16 +192,34 @@ export default function AdminSettingsPage() {
             fontSize: '13px',
             fontWeight: 700,
             cursor: 'pointer',
-            backgroundColor: activeTab === 'banners' ? 'var(--cw-color-primary)' : '#F1F5F9',
-            color: activeTab === 'banners' ? '#FFFFFF' : '#475569',
+            backgroundColor: activeTab === 'hero' ? 'var(--cw-color-primary)' : '#F1F5F9',
+            color: activeTab === 'hero' ? '#FFFFFF' : '#475569',
             display: 'flex',
             alignItems: 'center',
             gap: '8px'
           }}
         >
-          <span>🖼️ Homepage Promo Banners & Ads ({banners.length})</span>
+          <span>✨ Homepage Hero Banner ({heroSlides.length || 5} Slides)</span>
         </button>
       </div>
+
+      {heroFeedback && (
+        <div
+          style={{
+            padding: '12px 18px',
+            backgroundColor: '#DCFCE7',
+            color: '#166534',
+            borderRadius: 'var(--cw-radius-md)',
+            marginBottom: '20px',
+            fontSize: '13px',
+            fontWeight: 700,
+            border: '1px solid #86EFAC'
+          }}
+        >
+          {heroFeedback}
+        </div>
+      )}
+
 
       {savedFeedback && (
         <div
@@ -234,22 +238,6 @@ export default function AdminSettingsPage() {
         </div>
       )}
 
-      {bannerFeedback && (
-        <div
-          style={{
-            padding: '12px 18px',
-            backgroundColor: '#DCFCE7',
-            color: '#166534',
-            borderRadius: 'var(--cw-radius-md)',
-            marginBottom: '20px',
-            fontSize: '13px',
-            fontWeight: 700,
-            border: '1px solid #86EFAC'
-          }}
-        >
-          {bannerFeedback}
-        </div>
-      )}
 
       {/* ========================================================================= */}
       {/* TAB 1: STORE PROFILE & OPERATIONS                                          */}
@@ -498,9 +486,9 @@ export default function AdminSettingsPage() {
       )}
 
       {/* ========================================================================= */}
-      {/* TAB 2: HOMEPAGE PROMO BANNERS & ADS                                        */}
+      {/* TAB 2: HOMEPAGE HERO BANNER (5 SLIDES)                                     */}
       {/* ========================================================================= */}
-      {activeTab === 'banners' && (
+      {activeTab === 'hero' && (
         <div>
           <div
             style={{
@@ -508,337 +496,305 @@ export default function AdminSettingsPage() {
               borderRadius: 'var(--cw-radius-md)',
               border: '1px solid var(--cw-color-border)',
               padding: '24px',
-              marginBottom: '20px',
+              marginBottom: '24px',
               boxShadow: 'var(--cw-shadow-sm)'
             }}
           >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '12px' }}>
+            {/* Top Action Bar */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px', marginBottom: '20px', borderBottom: '1px solid #F1F5F9', paddingBottom: '16px' }}>
               <div>
-                <h2 style={{ fontSize: '18px', fontWeight: 800, color: '#0F172A', margin: 0 }}>
-                  Homepage Promotional Banners & Ad Cards
+                <h2 style={{ fontSize: '18px', fontWeight: 800, color: '#0F172A', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span>✨ 5-Slide Animated Homepage Hero Showcase</span>
                 </h2>
                 <p style={{ fontSize: '13px', color: '#64748B', marginTop: '4px' }}>
-                  Manage the 3 primary ad cards on the website homepage (Bhandara, Monthly Meal Plans, Mom's Daawat) or add new custom promotions.
+                  Directly upload 16:9 images, customize headlines, tags, bullet points and call-to-action buttons. No coding required.
                 </p>
               </div>
 
-              <div style={{ display: 'flex', gap: '10px' }}>
-                <button
-                  type="button"
-                  onClick={handleAddBanner}
-                  style={{
-                    padding: '9px 16px',
-                    backgroundColor: '#0F172A',
-                    color: '#FFFFFF',
-                    border: 'none',
-                    borderRadius: 'var(--cw-radius-md)',
-                    fontSize: '13px',
-                    fontWeight: 700,
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px'
-                  }}
-                >
-                  + Add New Ad Card
-                </button>
-
-                <button
-                  type="button"
-                  onClick={handleSaveBanners}
-                  disabled={savingBanners}
-                  style={{
-                    padding: '9px 20px',
-                    backgroundColor: 'var(--cw-color-primary)',
-                    color: '#FFFFFF',
-                    border: 'none',
-                    borderRadius: 'var(--cw-radius-md)',
-                    fontSize: '13px',
-                    fontWeight: 700,
-                    cursor: savingBanners ? 'not-allowed' : 'pointer',
-                    opacity: savingBanners ? 0.7 : 1,
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    boxShadow: '0 2px 6px rgba(111, 67, 42, 0.2)'
-                  }}
-                >
-                  {savingBanners ? 'Saving...' : '💾 Save All Banners'}
-                </button>
-              </div>
+              <button
+                type="button"
+                onClick={handleSaveHeroSlides}
+                disabled={savingHero || loadingHero}
+                style={{
+                  padding: '10px 22px',
+                  backgroundColor: 'var(--cw-color-primary)',
+                  color: '#FFFFFF',
+                  border: 'none',
+                  borderRadius: 'var(--cw-radius-md)',
+                  fontSize: '13.5px',
+                  fontWeight: 700,
+                  cursor: savingHero ? 'not-allowed' : 'pointer',
+                  opacity: savingHero ? 0.7 : 1,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  boxShadow: '0 2px 6px rgba(0,0,0,0.12)'
+                }}
+              >
+                <span>{savingHero ? 'Saving Hero Slides...' : '💾 Save Hero Showcase'}</span>
+              </button>
             </div>
 
-            {loadingBanners ? (
-              <div style={{ padding: '40px', textAlign: 'center', color: '#64748B' }}>
-                <p style={{ fontSize: '14px', fontWeight: 600 }}>Loading promotional banners...</p>
+            {loadingHero ? (
+              <div style={{ padding: '60px', textAlign: 'center', color: '#64748B' }}>
+                <p style={{ fontSize: '14px', fontWeight: 600 }}>Loading Hero Showcase settings...</p>
               </div>
-            ) : banners.length === 0 ? (
-              <div style={{ padding: '40px', textAlign: 'center', color: '#64748B', border: '2px dashed #E2E8F0', borderRadius: '12px' }}>
-                <p style={{ fontSize: '15px', fontWeight: 700, color: '#334155' }}>No promotional banners found</p>
-                <p style={{ fontSize: '13px', color: '#64748B', marginBottom: '16px' }}>Click below to add your first homepage promotional card</p>
+            ) : heroSlides.length === 0 ? (
+              <div style={{ padding: '40px', textAlign: 'center', color: '#64748B', backgroundColor: '#F8FAFC', borderRadius: '12px' }}>
+                <p style={{ fontSize: '14px', fontWeight: 600 }}>Default 5 slides will be initialized upon saving.</p>
                 <button
                   type="button"
-                  onClick={handleAddBanner}
+                  onClick={handleSaveHeroSlides}
                   style={{
-                    padding: '8px 18px',
+                    marginTop: '12px',
+                    padding: '8px 20px',
                     backgroundColor: 'var(--cw-color-primary)',
-                    color: '#FFFFFF',
+                    color: '#FFF',
                     border: 'none',
-                    borderRadius: '6px',
-                    fontSize: '13px',
+                    borderRadius: '8px',
                     fontWeight: 700,
                     cursor: 'pointer'
                   }}
                 >
-                  + Add Ad Card
+                  Initialize 5 Master Slides
                 </button>
               </div>
             ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-                {banners.map((b, idx) => {
-                  const resolvedImg = resolveMediaUrl(b.image);
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '28px' }}>
+                {heroSlides.map((slide, idx) => {
                   return (
                     <div
-                      key={b.id || idx}
+                      key={slide.id || `slide-${idx}`}
                       style={{
-                        border: '1px solid #E2E8F0',
                         borderRadius: '12px',
+                        border: '1px solid #E2E8F0',
+                        backgroundColor: '#F8FAFC',
                         padding: '20px',
-                        backgroundColor: b.isActive ? '#FFFFFF' : '#F8FAFC',
-                        boxShadow: '0 2px 8px rgba(0,0,0,0.03)',
-                        position: 'relative'
+                        boxShadow: '0 1px 4px rgba(0,0,0,0.03)'
                       }}
                     >
-                      {/* Banner Header: Title & Switch */}
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '10px' }}>
+                      {/* Slide Header */}
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', borderBottom: '1px solid #E2E8F0', paddingBottom: '12px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                          <span
-                            style={{
-                              width: '26px',
-                              height: '26px',
-                              borderRadius: '50%',
-                              backgroundColor: '#0F172A',
-                              color: '#FFFFFF',
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              fontSize: '12px',
-                              fontWeight: 800
-                            }}
-                          >
-                            {idx + 1}
+                          <span style={{ padding: '4px 10px', borderRadius: '6px', backgroundColor: '#0F172A', color: '#F8FAFC', fontSize: '12px', fontWeight: 800 }}>
+                            SLIDE 0{idx + 1}
                           </span>
-                          <span style={{ fontSize: '15px', fontWeight: 800, color: '#0F172A' }}>
-                            {b.title || `Banner #${idx + 1}`}
+                          <span style={{ fontSize: '15px', fontWeight: 700, color: '#1E293B' }}>
+                            {slide.badge || `Slide ${idx + 1}`}
                           </span>
                         </div>
-
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                          <label style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontSize: '12.5px', fontWeight: 700 }}>
-                            <input
-                              type="checkbox"
-                              checked={b.isActive}
-                              onChange={(e) => handleBannerChange(idx, 'isActive', e.target.checked)}
-                              style={{ width: '16px', height: '16px', accentColor: '#16A34A' }}
-                            />
-                            <span style={{ color: b.isActive ? '#16A34A' : '#94A3B8' }}>
-                              {b.isActive ? '● Live on Homepage' : '○ Hidden'}
-                            </span>
-                          </label>
-
-                          <button
-                            type="button"
-                            onClick={() => handleDeleteBanner(idx)}
-                            style={{
-                              padding: '5px 10px',
-                              backgroundColor: '#FEE2E2',
-                              color: '#DC2626',
-                              border: 'none',
-                              borderRadius: '6px',
-                              fontSize: '12px',
-                              fontWeight: 700,
-                              cursor: 'pointer'
-                            }}
-                          >
-                            🗑️ Delete
-                          </button>
-                        </div>
+                        <span style={{ fontSize: '12px', color: '#94A3B8', fontWeight: 600 }}>
+                          ID: {slide.id}
+                        </span>
                       </div>
 
-                      {/* Main Grid: Image on Left / Details on Right */}
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '20px' }}>
-                        {/* Image Preview & Upload */}
+                      {/* 2-Column Grid */}
+                      <div style={{ display: 'grid', gridTemplateColumns: '320px 1fr', gap: '24px', alignItems: 'start' }}>
+                        
+                        {/* Left Column: 16:9 Image Preview & Upload */}
                         <div>
-                          <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#475569', marginBottom: '6px' }}>
-                            Banner Image Preview
+                          <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#334155', marginBottom: '8px' }}>
+                            16:9 Showcase Image Preview
                           </label>
                           <div
                             style={{
                               width: '100%',
-                              height: '200px',
+                              aspectRatio: '16 / 9',
                               borderRadius: '10px',
                               overflow: 'hidden',
-                              backgroundColor: '#1E293B',
+                              backgroundColor: '#0F172A',
                               border: '1px solid #CBD5E1',
                               position: 'relative',
-                              marginBottom: '10px',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center'
+                              marginBottom: '12px'
                             }}
                           >
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
                             <img
-                              src={resolvedImg}
-                              alt={b.title}
-                              onError={(e) => {
-                                (e.target as HTMLImageElement).src = '/assets/images/chai.jpg';
-                              }}
-                              style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+                              src={resolveMediaUrl(slide.image)}
+                              alt={slide.imageAlt || `Hero Slide ${idx + 1}`}
+                              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                             />
-                            {uploadingBannerIndex === idx && (
-                              <div
-                                style={{
-                                  position: 'absolute',
-                                  inset: 0,
-                                  backgroundColor: 'rgba(0,0,0,0.7)',
-                                  color: '#FFFFFF',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                  fontSize: '13px',
-                                  fontWeight: 700
-                                }}
-                              >
-                                ⏳ Uploading image...
-                              </div>
-                            )}
                           </div>
 
-                          <label
+                          {/* Direct File Upload (Supabase storage) */}
+                          <input
+                            type="file"
+                            id={`hero-file-upload-${idx}`}
+                            accept="image/*"
+                            style={{ display: 'none' }}
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (file) handleHeroImageUpload(idx, file);
+                            }}
+                          />
+
+                          <button
+                            type="button"
+                            onClick={() => document.getElementById(`hero-file-upload-${idx}`)?.click()}
+                            disabled={uploadingHeroIndex === idx}
                             style={{
+                              width: '100%',
+                              padding: '9px 14px',
+                              backgroundColor: '#0284C7',
+                              color: '#FFFFFF',
+                              border: 'none',
+                              borderRadius: '7px',
+                              fontSize: '12.5px',
+                              fontWeight: 700,
+                              cursor: uploadingHeroIndex === idx ? 'not-allowed' : 'pointer',
                               display: 'flex',
                               alignItems: 'center',
                               justifyContent: 'center',
-                              gap: '8px',
-                              textAlign: 'center',
-                              padding: '10px 14px',
-                              backgroundColor: '#F8FAFC',
-                              border: '1.5px dashed #64748B',
-                              borderRadius: '8px',
-                              fontSize: '12.5px',
-                              fontWeight: 700,
-                              color: '#1E293B',
-                              cursor: 'pointer',
-                              width: '100%',
-                              transition: 'all 0.15s ease'
+                              gap: '6px',
+                              marginBottom: '8px'
                             }}
                           >
-                            📁 Upload / Change Image File
-                            <input
-                              type="file"
-                              accept="image/*"
-                              style={{ display: 'none' }}
-                              onChange={(e) => {
-                                if (e.target.files && e.target.files[0]) {
-                                  handleBannerImageUpload(idx, e.target.files[0]);
-                                }
-                              }}
-                            />
-                          </label>
+                            <span>{uploadingHeroIndex === idx ? '⏳ Uploading to Supabase...' : '📁 Upload / Change Image File'}</span>
+                          </button>
+
+                          <div style={{ fontSize: '11px', color: '#64748B', wordBreak: 'break-all' }}>
+                            <strong>Path:</strong> {slide.image}
+                          </div>
                         </div>
 
-                        {/* Text Fields */}
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                          <div>
-                            <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#334155', marginBottom: '4px' }}>
-                              Header Tag / Badge
-                            </label>
-                            <input
-                              type="text"
-                              value={b.badge}
-                              onChange={(e) => handleBannerChange(idx, 'badge', e.target.value)}
-                              placeholder="e.g. 3-Day Trial Meal @ ₹79 Only! or Bhandara Catering"
-                              style={{ width: '100%', padding: '8px 10px', borderRadius: '6px', border: '1px solid #CBD5E1', fontSize: '13px' }}
-                            />
+                        {/* Right Column: Text & CTA Settings */}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                          
+                          {/* Row 1: Badge & Tagline */}
+                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+                            <div>
+                              <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#334155', marginBottom: '4px' }}>
+                                Pill Badge Text
+                              </label>
+                              <input
+                                type="text"
+                                value={slide.badge}
+                                onChange={(e) => handleHeroSlideChange(idx, 'badge', e.target.value)}
+                                placeholder="e.g. Chaiwale Flagship Menu"
+                                style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #CBD5E1', fontSize: '13px' }}
+                              />
+                            </div>
+
+                            <div>
+                              <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#334155', marginBottom: '4px' }}>
+                                Sub-tag
+                              </label>
+                              <input
+                                type="text"
+                                value={slide.tag}
+                                onChange={(e) => handleHeroSlideChange(idx, 'tag', e.target.value)}
+                                placeholder="e.g. Chai, Snacks & All-Day Adda"
+                                style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #CBD5E1', fontSize: '13px' }}
+                              />
+                            </div>
                           </div>
 
-                          <div>
-                            <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#334155', marginBottom: '4px' }}>
-                              Main Headline / Title
-                            </label>
-                            <input
-                              type="text"
-                              value={b.title}
-                              onChange={(e) => handleBannerChange(idx, 'title', e.target.value)}
-                              placeholder="e.g. Good Food For A Better You"
-                              style={{ width: '100%', padding: '8px 10px', borderRadius: '6px', border: '1px solid #CBD5E1', fontSize: '13px', fontWeight: 700 }}
-                            />
+                          {/* Row 2: Headline & Headline Accent */}
+                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+                            <div>
+                              <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#334155', marginBottom: '4px' }}>
+                                Main Headline Line 1
+                              </label>
+                              <input
+                                type="text"
+                                value={slide.headline}
+                                onChange={(e) => handleHeroSlideChange(idx, 'headline', e.target.value)}
+                                placeholder="e.g. Dilli Ka Dilchasp Swad,"
+                                style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #CBD5E1', fontSize: '13px', fontWeight: 600 }}
+                              />
+                            </div>
+
+                            <div>
+                              <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#D96B27', marginBottom: '4px' }}>
+                                Highlight Headline Line 2 (Gradient Text)
+                              </label>
+                              <input
+                                type="text"
+                                value={slide.headlineAccent}
+                                onChange={(e) => handleHeroSlideChange(idx, 'headlineAccent', e.target.value)}
+                                placeholder="e.g. Har Pal, Har Bite Me."
+                                style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #CBD5E1', fontSize: '13px', fontWeight: 700, color: '#D96B27' }}
+                              />
+                            </div>
                           </div>
 
+                          {/* Row 3: Subtitle Description */}
                           <div>
                             <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#334155', marginBottom: '4px' }}>
-                              Description Copy
+                              Description Paragraph
                             </label>
                             <textarea
                               rows={2}
-                              value={b.description}
-                              onChange={(e) => handleBannerChange(idx, 'description', e.target.value)}
-                              placeholder="Detailed offer copy explaining the feast, package, or meal plan..."
-                              style={{ width: '100%', padding: '8px 10px', borderRadius: '6px', border: '1px solid #CBD5E1', fontSize: '12.5px', lineHeight: 1.5 }}
+                              value={slide.sub}
+                              onChange={(e) => handleHeroSlideChange(idx, 'sub', e.target.value)}
+                              placeholder="Describe this offering in 1-2 engaging sentences..."
+                              style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #CBD5E1', fontSize: '13px', lineHeight: 1.5 }}
                             />
                           </div>
 
-                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                          {/* Row 4: CTAs */}
+                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
                             <div>
-                              <label style={{ display: 'block', fontSize: '11.5px', fontWeight: 700, color: '#475569', marginBottom: '4px' }}>
-                                Button Text
+                              <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#334155', marginBottom: '4px' }}>
+                                Primary Button Label & Link
                               </label>
-                              <input
-                                type="text"
-                                value={b.ctaText}
-                                onChange={(e) => handleBannerChange(idx, 'ctaText', e.target.value)}
-                                placeholder="e.g. Order Online"
-                                style={{ width: '100%', padding: '7px 10px', borderRadius: '6px', border: '1px solid #CBD5E1', fontSize: '12.5px' }}
-                              />
+                              <div style={{ display: 'flex', gap: '8px' }}>
+                                <input
+                                  type="text"
+                                  value={slide.primaryCtaLabel}
+                                  onChange={(e) => handleHeroSlideChange(idx, 'primaryCtaLabel', e.target.value)}
+                                  placeholder="e.g. Explore Full Menu"
+                                  style={{ flex: 1, padding: '7px 10px', borderRadius: '6px', border: '1px solid #CBD5E1', fontSize: '12.5px' }}
+                                />
+                                <input
+                                  type="text"
+                                  value={slide.primaryCtaHref}
+                                  onChange={(e) => handleHeroSlideChange(idx, 'primaryCtaHref', e.target.value)}
+                                  placeholder="e.g. /menu"
+                                  style={{ flex: 1, padding: '7px 10px', borderRadius: '6px', border: '1px solid #CBD5E1', fontSize: '12.5px' }}
+                                />
+                              </div>
                             </div>
+
                             <div>
-                              <label style={{ display: 'block', fontSize: '11.5px', fontWeight: 700, color: '#475569', marginBottom: '4px' }}>
-                                Button URL / Link
+                              <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#15803D', marginBottom: '4px' }}>
+                                WhatsApp Button Label & URL
                               </label>
-                              <input
-                                type="text"
-                                value={b.ctaLink}
-                                onChange={(e) => handleBannerChange(idx, 'ctaLink', e.target.value)}
-                                placeholder="e.g. /catering#bhandara"
-                                style={{ width: '100%', padding: '7px 10px', borderRadius: '6px', border: '1px solid #CBD5E1', fontSize: '12.5px' }}
-                              />
+                              <div style={{ display: 'flex', gap: '8px' }}>
+                                <input
+                                  type="text"
+                                  value={slide.waCtaLabel}
+                                  onChange={(e) => handleHeroSlideChange(idx, 'waCtaLabel', e.target.value)}
+                                  placeholder="e.g. Order on WhatsApp"
+                                  style={{ flex: 1, padding: '7px 10px', borderRadius: '6px', border: '1px solid #CBD5E1', fontSize: '12.5px' }}
+                                />
+                                <input
+                                  type="text"
+                                  value={slide.waCtaHref}
+                                  onChange={(e) => handleHeroSlideChange(idx, 'waCtaHref', e.target.value)}
+                                  placeholder="https://wa.me/..."
+                                  style={{ flex: 1, padding: '7px 10px', borderRadius: '6px', border: '1px solid #CBD5E1', fontSize: '12.5px' }}
+                                />
+                              </div>
                             </div>
                           </div>
 
-                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-                            <div>
-                              <label style={{ display: 'block', fontSize: '11.5px', fontWeight: 700, color: '#475569', marginBottom: '4px' }}>
-                                WhatsApp Number
-                              </label>
-                              <input
-                                type="text"
-                                value={b.whatsappNumber || ''}
-                                onChange={(e) => handleBannerChange(idx, 'whatsappNumber', e.target.value)}
-                                placeholder="e.g. 918800410441"
-                                style={{ width: '100%', padding: '7px 10px', borderRadius: '6px', border: '1px solid #CBD5E1', fontSize: '12.5px' }}
-                              />
-                            </div>
-                            <div>
-                              <label style={{ display: 'block', fontSize: '11.5px', fontWeight: 700, color: '#475569', marginBottom: '4px' }}>
-                                WhatsApp Prefilled Message
-                              </label>
-                              <input
-                                type="text"
-                                value={b.whatsappText || ''}
-                                onChange={(e) => handleBannerChange(idx, 'whatsappText', e.target.value)}
-                                placeholder="e.g. TRIAL"
-                                style={{ width: '100%', padding: '7px 10px', borderRadius: '6px', border: '1px solid #CBD5E1', fontSize: '12.5px' }}
-                              />
+                          {/* Row 5: 3 Highlights Bullets */}
+                          <div>
+                            <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#334155', marginBottom: '4px' }}>
+                              3 Key Highlights (Bullets with checkmarks)
+                            </label>
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
+                              {[0, 1, 2].map((bIdx) => (
+                                <input
+                                  key={`b-${idx}-${bIdx}`}
+                                  type="text"
+                                  value={slide.highlights?.[bIdx] || ''}
+                                  onChange={(e) => handleHeroHighlightChange(idx, bIdx, e.target.value)}
+                                  placeholder={`Highlight #${bIdx + 1}`}
+                                  style={{ padding: '7px 10px', borderRadius: '6px', border: '1px solid #CBD5E1', fontSize: '12px' }}
+                                />
+                              ))}
                             </div>
                           </div>
                         </div>
@@ -850,26 +806,26 @@ export default function AdminSettingsPage() {
             )}
 
             {/* Bottom Save Button */}
-            {banners.length > 0 && (
-              <div style={{ marginTop: '24px', display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
+            {heroSlides.length > 0 && (
+              <div style={{ marginTop: '28px', display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
                 <button
                   type="button"
-                  onClick={handleSaveBanners}
-                  disabled={savingBanners}
+                  onClick={handleSaveHeroSlides}
+                  disabled={savingHero}
                   style={{
-                    padding: '12px 28px',
+                    padding: '12px 32px',
                     backgroundColor: 'var(--cw-color-primary)',
                     color: '#FFFFFF',
                     border: 'none',
                     borderRadius: 'var(--cw-radius-md)',
                     fontSize: '14px',
                     fontWeight: 700,
-                    cursor: savingBanners ? 'not-allowed' : 'pointer',
-                    opacity: savingBanners ? 0.7 : 1,
-                    boxShadow: '0 2px 6px rgba(0,0,0,0.15)'
+                    cursor: savingHero ? 'not-allowed' : 'pointer',
+                    opacity: savingHero ? 0.7 : 1,
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.15)'
                   }}
                 >
-                  {savingBanners ? 'Saving Changes...' : '💾 Save All Homepage Banners'}
+                  {savingHero ? 'Saving Hero Showcase...' : '💾 Save All 5 Hero Showcase Slides'}
                 </button>
               </div>
             )}
@@ -879,3 +835,4 @@ export default function AdminSettingsPage() {
     </div>
   );
 }
+

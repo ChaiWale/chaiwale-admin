@@ -1008,4 +1008,49 @@ export async function updatePromoBanners(banners: PromoBannerDto[]): Promise<Pro
   return json.data;
 }
 
+export interface HeroSlideDto {
+  id: string;
+  badge: string;
+  tag: string;
+  headline: string;
+  headlineAccent: string;
+  sub: string;
+  primaryCtaLabel: string;
+  primaryCtaHref: string;
+  waCtaLabel: string;
+  waCtaHref: string;
+  highlights: string[];
+  image: string;
+  imageAlt: string;
+  order: number;
+}
+
+export async function fetchHeroSlides(): Promise<HeroSlideDto[]> {
+  try {
+    const res = await fetch(`${BACKEND_URL}/api/v1/config/hero`, {
+      cache: 'no-store'
+    });
+    if (!res.ok) return [];
+    const json = await res.json();
+    return json.data || [];
+  } catch (err) {
+    console.error('Failed to fetch hero slides:', err);
+    return [];
+  }
+}
+
+export async function updateHeroSlides(slides: HeroSlideDto[]): Promise<HeroSlideDto[]> {
+  const res = await authFetch(`${BACKEND_URL}/api/v1/config/hero`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ slides })
+  });
+  const json = await res.json();
+  if (!res.ok || !json.success) {
+    throw new Error(json.message || 'Failed to update hero slides');
+  }
+  return json.data;
+}
+
+
 
