@@ -675,13 +675,16 @@ export default function AdminSettingsPage() {
                           <div
                             style={{
                               width: '100%',
-                              height: '180px',
+                              height: '200px',
                               borderRadius: '10px',
                               overflow: 'hidden',
-                              backgroundColor: '#F1F5F9',
+                              backgroundColor: '#1E293B',
                               border: '1px solid #CBD5E1',
                               position: 'relative',
-                              marginBottom: '10px'
+                              marginBottom: '10px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center'
                             }}
                           >
                             <img
@@ -690,14 +693,14 @@ export default function AdminSettingsPage() {
                               onError={(e) => {
                                 (e.target as HTMLImageElement).src = '/assets/images/chai.jpg';
                               }}
-                              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                              style={{ width: '100%', height: '100%', objectFit: 'contain' }}
                             />
                             {uploadingBannerIndex === idx && (
                               <div
                                 style={{
                                   position: 'absolute',
                                   inset: 0,
-                                  backgroundColor: 'rgba(0,0,0,0.6)',
+                                  backgroundColor: 'rgba(0,0,0,0.7)',
                                   color: '#FFFFFF',
                                   display: 'flex',
                                   alignItems: 'center',
@@ -706,59 +709,42 @@ export default function AdminSettingsPage() {
                                   fontWeight: 700
                                 }}
                               >
-                                Uploading image...
+                                ⏳ Uploading image...
                               </div>
                             )}
                           </div>
 
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                            <div>
-                              <label style={{ display: 'block', fontSize: '11px', color: '#64748B', marginBottom: '4px' }}>
-                                Image URL / Relative Path
-                              </label>
-                              <input
-                                type="text"
-                                value={b.image}
-                                onChange={(e) => handleBannerChange(idx, 'image', e.target.value)}
-                                placeholder="/assets/bhandara-banner.jpg or https://..."
-                                style={{
-                                  width: '100%',
-                                  padding: '7px 10px',
-                                  borderRadius: '6px',
-                                  border: '1px solid #CBD5E1',
-                                  fontSize: '12px',
-                                  fontFamily: 'monospace'
-                                }}
-                              />
-                            </div>
-
-                            <label
-                              style={{
-                                display: 'inline-block',
-                                textAlign: 'center',
-                                padding: '8px 12px',
-                                backgroundColor: '#F1F5F9',
-                                border: '1px dashed #94A3B8',
-                                borderRadius: '6px',
-                                fontSize: '12px',
-                                fontWeight: 700,
-                                color: '#334155',
-                                cursor: 'pointer'
+                          <label
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              gap: '8px',
+                              textAlign: 'center',
+                              padding: '10px 14px',
+                              backgroundColor: '#F8FAFC',
+                              border: '1.5px dashed #64748B',
+                              borderRadius: '8px',
+                              fontSize: '12.5px',
+                              fontWeight: 700,
+                              color: '#1E293B',
+                              cursor: 'pointer',
+                              width: '100%',
+                              transition: 'all 0.15s ease'
+                            }}
+                          >
+                            📁 Upload / Change Image File
+                            <input
+                              type="file"
+                              accept="image/*"
+                              style={{ display: 'none' }}
+                              onChange={(e) => {
+                                if (e.target.files && e.target.files[0]) {
+                                  handleBannerImageUpload(idx, e.target.files[0]);
+                                }
                               }}
-                            >
-                              📁 Upload / Change Image File
-                              <input
-                                type="file"
-                                accept="image/*"
-                                style={{ display: 'none' }}
-                                onChange={(e) => {
-                                  if (e.target.files && e.target.files[0]) {
-                                    handleBannerImageUpload(idx, e.target.files[0]);
-                                  }
-                                }}
-                              />
-                            </label>
-                          </div>
+                            />
+                          </label>
                         </div>
 
                         {/* Text Fields */}

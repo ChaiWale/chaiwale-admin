@@ -212,10 +212,6 @@ export default function AdminShell({ children }: AdminShellProps) {
           })}
         </nav>
 
-        {/* Bottom Store Indicator */}
-        <div style={{ padding: '14px 20px', borderTop: '1px solid #2D3748', fontSize: '11px', color: '#64748B' }}>
-          <span>Outlet: <strong style={{ color: '#94A3B8' }}>Netaji Subhash Place (NSP)</strong></span>
-        </div>
       </aside>
 
       {/* Mobile Off-Canvas Drawer */}

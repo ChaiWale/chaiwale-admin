@@ -530,6 +530,9 @@ export function resolveMediaUrl(path: string | null | undefined): string {
   if (path.startsWith('http://') || path.startsWith('https://') || path.startsWith('data:')) {
     return path;
   }
+  if (path.startsWith('/assets/')) {
+    return path;
+  }
   if (path.startsWith('/')) {
     return `${BACKEND_URL}${path}`;
   }
