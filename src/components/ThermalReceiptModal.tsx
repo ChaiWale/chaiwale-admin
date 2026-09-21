@@ -174,7 +174,46 @@ export const ThermalReceiptModal: React.FC<Props> = ({ isOpen, onClose, data }) 
   };
 
   const handlePrint = () => {
-    window.print();
+    const receiptEl = document.getElementById('chaiwale-receipt-slip');
+    if (!receiptEl) { window.print(); return; }
+
+    const receiptHtml = receiptEl.outerHTML;
+    const printWin = window.open('', '_blank', 'width=420,height=700,scrollbars=yes');
+    if (!printWin) { window.print(); return; }
+
+    printWin.document.write(`
+      <!DOCTYPE html>
+      <html lang="en">
+        <head>
+          <meta charset="UTF-8" />
+          <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+          <title>Chaiwale Receipt</title>
+          <style>
+            * { box-sizing: border-box; margin: 0; padding: 0; }
+            body {
+              background: #ffffff;
+              display: flex;
+              justify-content: center;
+              padding: 8px;
+              font-family: 'Courier New', Courier, monospace;
+            }
+            @media print {
+              @page { size: 80mm auto; margin: 2mm; }
+              body { padding: 0; }
+            }
+          </style>
+        </head>
+        <body>
+          ${receiptHtml}
+          <script>
+            window.onload = function() {
+              setTimeout(function() { window.print(); window.close(); }, 350);
+            };
+          <\/script>
+        </body>
+      </html>
+    `);
+    printWin.document.close();
   };
 
   const isKOT = viewMode === 'KOT';
@@ -803,33 +842,9 @@ export const ThermalReceiptModal: React.FC<Props> = ({ isOpen, onClose, data }) 
         }
 
         @media print {
-          body * {
-            visibility: hidden !important;
-          }
-          .receipt-modal-backdrop,
-          #chaiwale-receipt-slip,
-          #chaiwale-receipt-slip * {
-            visibility: visible !important;
-          }
-          .receipt-modal-backdrop {
-            position: static !important;
-            background: transparent !important;
-            padding: 0 !important;
-            backdrop-filter: none !important;
-          }
-          .receipt-action-buttons,
-          button {
+          /* Suppress main page when printing from the modal overlay */
+          body > *:not(.receipt-modal-backdrop) {
             display: none !important;
-          }
-          #chaiwale-receipt-slip {
-            position: static !important;
-            transform: none !important;
-            width: 100% !important;
-            max-width: 320px !important;
-            margin: 0 auto !important;
-            box-shadow: none !important;
-            clip-path: none !important;
-            border: 1px solid #ccc !important;
           }
         }
       `}</style>
