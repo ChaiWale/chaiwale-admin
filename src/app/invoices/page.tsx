@@ -396,7 +396,7 @@ export default function AdminInvoicesPage() {
                             </button>
                           )}
                           <a
-                            href={getInvoicePdfUrl(inv.id)}
+                            href={getInvoicePdfUrl(inv.invoice_number)}
                             target="_blank"
                             rel="noreferrer"
                             style={{
@@ -713,7 +713,7 @@ export default function AdminInvoicesPage() {
             >
               <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                 <a
-                  href={getInvoicePdfUrl(viewInvoice.id)}
+                  href={getInvoicePdfUrl(viewInvoice.invoice_number)}
                   target="_blank"
                   rel="noreferrer"
                   style={{
