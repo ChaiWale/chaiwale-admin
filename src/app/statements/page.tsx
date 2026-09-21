@@ -224,7 +224,7 @@ export default function AdminStatementsPage() {
                       </span>
                     </td>
                     <td style={{ padding: '12px 16px', color: '#64748B' }}>
-                      {inv.issued_at ? new Date(inv.issued_at).toLocaleDateString('en-IN') : '-'}
+                      {inv.issued_at ? new Date(inv.issued_at).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', year: 'numeric' }) : '-'}
                     </td>
                     <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 700, color: '#0F172A' }}>
                       ₹{Number(inv.grand_total || 0).toFixed(2)}
@@ -258,7 +258,7 @@ export default function AdminStatementsPage() {
       <div style={{ backgroundColor: '#FFFFFF', padding: '20px 24px', borderRadius: 'var(--cw-radius-md)', border: '1px solid var(--cw-color-border)' }}>
         <h3 style={{ fontSize: '15px', fontWeight: 700, marginBottom: '6px' }}>Zero-Tax & Operations Accounting Guide</h3>
         <p style={{ fontSize: '13px', color: '#64748B', lineHeight: 1.6, margin: 0 }}>
-          Chaiwale operations run on pure itemized pricing with zero tax calculation (Subtotal equals Grand Total). All orders punched at the counter POS or placed online are recorded in real-time in Supabase PostgreSQL with verified audit trails, instant payment recording, and double-entry corporate customer ledgers.
+          Chaiwale operations run on pure itemized pricing with zero tax calculation (Subtotal equals Grand Total). All orders punched at the counter POS or placed online are recorded in real-time with verified audit trails, instant payment recording, and double-entry corporate customer ledgers.
         </p>
       </div>
     </div>

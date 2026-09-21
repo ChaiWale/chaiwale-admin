@@ -149,7 +149,7 @@ export default function AdminOrdersPage() {
         <div>
           <h1 style={{ fontSize: '24px', fontWeight: 800, color: '#1E2328' }}>Live Order Stream</h1>
           <p style={{ fontSize: '13px', color: '#64748B', marginTop: '2px' }}>
-            Real-time orders connected directly to live Supabase backend
+            Live order stream synchronized across kitchen display, counter POS, and web storefront
           </p>
         </div>
         <div style={{ display: 'flex', gap: '12px' }}>
@@ -252,7 +252,7 @@ export default function AdminOrdersPage() {
       >
         {loading && orders.length === 0 ? (
           <div style={{ padding: '40px', textAlign: 'center', color: '#64748B' }}>
-            <p style={{ fontSize: '15px', fontWeight: 600 }}>Loading orders from live Supabase...</p>
+            <p style={{ fontSize: '15px', fontWeight: 600 }}>Loading live orders...</p>
           </div>
         ) : filteredOrders.length === 0 ? (
           <div style={{ padding: '40px', textAlign: 'center', color: '#64748B' }}>

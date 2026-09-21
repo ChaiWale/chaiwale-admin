@@ -179,7 +179,7 @@ export default function AdminAttendancePage() {
       }
 
       await saveAttendanceRecords(recordsToSave);
-      setFeedback(`✓ Successfully saved ${recordsToSave.length} attendance records to Supabase!`);
+      setFeedback(`✓ Successfully saved ${recordsToSave.length} attendance records!`);
       setTimeout(() => setFeedback(null), 4000);
     } catch (err: any) {
       setError(`Failed to save: ${err.message}`);
@@ -252,7 +252,7 @@ export default function AdminAttendancePage() {
         <div>
           <h1 style={{ fontSize: '24px', fontWeight: 700, color: '#1E2328' }}>Staff Monthly Attendance</h1>
           <p style={{ color: 'var(--cw-color-text-muted)', fontSize: '13px', marginTop: '2px' }}>
-            Operational register backed by Supabase • Month: <strong>{monthNames[selectedMonth - 1]} {selectedYear}</strong> • Total Staff: <strong>{staffList.length}</strong>
+            Daily Duty & Attendance Register • Month: <strong>{monthNames[selectedMonth - 1]} {selectedYear}</strong> • Total Staff: <strong>{staffList.length}</strong>
           </p>
         </div>
 
@@ -439,7 +439,7 @@ export default function AdminAttendancePage() {
       >
         {loading ? (
           <div style={{ padding: '40px', textAlign: 'center', color: '#64748B' }}>
-            <p style={{ fontSize: '15px', fontWeight: 600 }}>Loading roster from Supabase...</p>
+            <p style={{ fontSize: '15px', fontWeight: 600 }}>Loading staff attendance roster...</p>
           </div>
         ) : staffList.length === 0 ? (
           <div style={{ padding: '50px 20px', textAlign: 'center', color: '#64748B' }}>

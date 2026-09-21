@@ -251,7 +251,7 @@ export default function AdminCateringPage() {
       >
         {loading && leads.length === 0 ? (
           <div style={{ padding: '40px', textAlign: 'center', color: '#64748B' }}>
-            <p style={{ fontSize: '15px', fontWeight: 600 }}>Loading leads from Supabase...</p>
+            <p style={{ fontSize: '15px', fontWeight: 600 }}>Loading catering inquiries...</p>
           </div>
         ) : filteredLeads.length === 0 ? (
           <div style={{ padding: '40px', textAlign: 'center', color: '#64748B' }}>

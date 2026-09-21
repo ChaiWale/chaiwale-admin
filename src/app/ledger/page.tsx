@@ -55,7 +55,7 @@ export default function AdminLedgerPage() {
         <div>
           <h1 style={{ fontSize: '24px', fontWeight: 800, color: '#0F172A' }}>Customer & Corporate Credit Ledgers</h1>
           <p style={{ fontSize: '13px', color: '#64748B', marginTop: '2px' }}>
-            Authoritative double-entry audit trail backed by Supabase PostgreSQL (Admin Management Hub)
+            Authoritative double-entry audit trail and corporate credit customer billing ledger
           </p>
         </div>
         <div style={{ display: 'flex', gap: '8px' }}>
@@ -170,7 +170,7 @@ export default function AdminLedgerPage() {
       >
         {loading && entries.length === 0 ? (
           <div style={{ padding: '40px', textAlign: 'center', color: '#64748B' }}>
-            <p style={{ fontSize: '15px', fontWeight: 600 }}>Loading ledger entries from Supabase...</p>
+            <p style={{ fontSize: '15px', fontWeight: 600 }}>Loading ledger entries...</p>
           </div>
         ) : filteredEntries.length === 0 ? (
           <div style={{ padding: '40px', textAlign: 'center', color: '#64748B' }}>

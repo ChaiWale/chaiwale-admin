@@ -33,6 +33,7 @@ export default function AdminMenuPage() {
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [selectedCategoryFilter, setSelectedCategoryFilter] = useState<string>('ALL');
   const [availabilityFilter, setAvailabilityFilter] = useState<'ALL' | 'AVAILABLE' | 'UNAVAILABLE'>('ALL');
+  const [viewMode, setViewMode] = useState<'cards' | 'list'>('cards');
   const [togglingId, setTogglingId] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<string | null>(null);
 
@@ -112,7 +113,7 @@ export default function AdminMenuPage() {
     try {
       const updated = await toggleItemAvailability(item.id, nextState);
       setItems(prev => prev.map(i => (i.id === item.id ? { ...i, is_available: updated.is_available } : i)));
-      setFeedback(`"${item.name}" marked as ${nextState ? 'Available (Online)' : 'Unavailable (86’d)'}`);
+      setFeedback(`"${item.name}" marked as ${nextState ? 'In Stock (Available)' : 'Out of Stock'}`);
       setTimeout(() => setFeedback(null), 3500);
     } catch (err: any) {
       alert(`Toggle failed: ${err.message}`);
@@ -225,7 +226,7 @@ export default function AdminMenuPage() {
 
       setShowAddModal(false);
       resetAddForm();
-      setFeedback(`Added new item "${created.name}" with Supabase WebP photo!`);
+      setFeedback(`Added new item "${created.name}" successfully!`);
       loadMenu();
     } catch (err: any) {
       setAddError(err.message || 'Failed to create menu item');
@@ -382,22 +383,17 @@ export default function AdminMenuPage() {
     return matchesFilter && matchesCategory && matchesSearch;
   });
 
+  const availableCount = items.filter(i => i.is_available).length;
+  const unavailableCount = items.filter(i => !i.is_available).length;
+
   return (
     <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', flexWrap: 'wrap', gap: '16px' }}>
         <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-            <span style={{ fontSize: '11px', fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase', padding: '3px 8px', borderRadius: '4px', backgroundColor: '#FEF3C7', color: '#B45309' }}>
-              Zomato-Style Partner Console
-            </span>
-            <span style={{ fontSize: '11px', fontWeight: 600, color: '#10B981' }}>
-              ● Supabase WebP Storage Active
-            </span>
-          </div>
-          <h1 style={{ fontSize: '24px', fontWeight: 800, color: '#1E2328' }}>Menu Catalog & Variants Control</h1>
-          <p style={{ fontSize: '13px', color: '#64748B', marginTop: '2px' }}>
-            Live stock switches, portion pricing (Half/Full), spice indicators & high-res WebP food media synced across POS and web storefront.
+          <h1 style={{ fontSize: '24px', fontWeight: 800, color: '#1E2328' }}>Menu Catalog & Availability</h1>
+          <p style={{ fontSize: '13px', color: '#64748B', marginTop: '4px' }}>
+            Manage dish availability, portion pricing, categories, and real-time menu synchronization across counter POS and online ordering.
           </p>
         </div>
         <div style={{ display: 'flex', gap: '10px' }}>
@@ -538,58 +534,131 @@ export default function AdminMenuPage() {
         })}
       </div>
 
-      {/* Filters Bar */}
+      {/* Search, Filter & View Controls */}
       <div
         style={{
           display: 'flex',
-          gap: '16px',
-          alignItems: 'center',
           justifyContent: 'space-between',
+          alignItems: 'center',
           flexWrap: 'wrap',
+          gap: '12px',
           backgroundColor: '#FFFFFF',
-          padding: '16px 20px',
+          padding: '14px 18px',
           borderRadius: 'var(--cw-radius-md)',
           border: '1px solid var(--cw-color-border)',
           marginBottom: '20px'
         }}
       >
-        <div style={{ display: 'flex', gap: '8px' }}>
-          {(['ALL', 'AVAILABLE', 'UNAVAILABLE'] as const).map(f => (
-            <button
-              key={f}
-              onClick={() => setAvailabilityFilter(f)}
-              style={{
-                padding: '6px 14px',
-                borderRadius: '20px',
-                fontSize: '12px',
-                fontWeight: 600,
-                cursor: 'pointer',
-                border: 'none',
-                backgroundColor: availabilityFilter === f ? 'var(--cw-color-primary)' : '#F4F6F8',
-                color: availabilityFilter === f ? '#FFFFFF' : '#64748B'
-              }}
-            >
-              {f === 'ALL' ? 'All Items' : f === 'AVAILABLE' ? 'Active Only' : 'Unavailable (86’d)'}
-            </button>
-          ))}
+        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
+          <button
+            onClick={() => setAvailabilityFilter('ALL')}
+            style={{
+              padding: '6px 14px',
+              borderRadius: '20px',
+              fontSize: '12px',
+              fontWeight: 700,
+              cursor: 'pointer',
+              border: 'none',
+              backgroundColor: availabilityFilter === 'ALL' ? 'var(--cw-color-primary)' : '#F4F6F8',
+              color: availabilityFilter === 'ALL' ? '#FFFFFF' : '#64748B'
+            }}
+          >
+            All Items ({items.length})
+          </button>
+          <button
+            onClick={() => setAvailabilityFilter('AVAILABLE')}
+            style={{
+              padding: '6px 14px',
+              borderRadius: '20px',
+              fontSize: '12px',
+              fontWeight: 700,
+              cursor: 'pointer',
+              border: 'none',
+              backgroundColor: availabilityFilter === 'AVAILABLE' ? '#16A34A' : '#F4F6F8',
+              color: availabilityFilter === 'AVAILABLE' ? '#FFFFFF' : '#64748B'
+            }}
+          >
+            ● In Stock ({availableCount})
+          </button>
+          <button
+            onClick={() => setAvailabilityFilter('UNAVAILABLE')}
+            style={{
+              padding: '6px 14px',
+              borderRadius: '20px',
+              fontSize: '12px',
+              fontWeight: 700,
+              cursor: 'pointer',
+              border: 'none',
+              backgroundColor: availabilityFilter === 'UNAVAILABLE' ? '#DC2626' : '#F4F6F8',
+              color: availabilityFilter === 'UNAVAILABLE' ? '#FFFFFF' : '#64748B'
+            }}
+          >
+            ✕ Out of Stock ({unavailableCount})
+          </button>
         </div>
 
-        <input
-          type="text"
-          placeholder="Search dishes by name, category, tags, spice, variants, or keywords..."
-          value={searchQuery}
-          onChange={e => setSearchQuery(e.target.value)}
-          style={{
-            padding: '8px 14px',
-            border: '1px solid var(--cw-color-border)',
-            borderRadius: 'var(--cw-radius-md)',
-            fontSize: '13px',
-            minWidth: '260px'
-          }}
-        />
+        <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
+          {/* Dual View Toggle */}
+          <div style={{ display: 'flex', gap: '2px', backgroundColor: '#F1F5F9', padding: '3px', borderRadius: '8px', border: '1px solid #E2E8F0' }}>
+            <button
+              type="button"
+              onClick={() => setViewMode('cards')}
+              style={{
+                padding: '6px 12px',
+                borderRadius: '6px',
+                border: 'none',
+                fontSize: '12px',
+                fontWeight: 700,
+                cursor: 'pointer',
+                backgroundColor: viewMode === 'cards' ? '#FFFFFF' : 'transparent',
+                color: viewMode === 'cards' ? 'var(--cw-color-primary)' : '#64748B',
+                boxShadow: viewMode === 'cards' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '5px'
+              }}
+            >
+              <span>⊞</span> Card View
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode('list')}
+              style={{
+                padding: '6px 12px',
+                borderRadius: '6px',
+                border: 'none',
+                fontSize: '12px',
+                fontWeight: 700,
+                cursor: 'pointer',
+                backgroundColor: viewMode === 'list' ? '#FFFFFF' : 'transparent',
+                color: viewMode === 'list' ? 'var(--cw-color-primary)' : '#64748B',
+                boxShadow: viewMode === 'list' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '5px'
+              }}
+            >
+              <span>☰</span> List View
+            </button>
+          </div>
+
+          <input
+            type="text"
+            placeholder="Search dishes by name, category, tags..."
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+            style={{
+              padding: '8px 14px',
+              border: '1px solid var(--cw-color-border)',
+              borderRadius: 'var(--cw-radius-md)',
+              fontSize: '13px',
+              minWidth: '260px'
+            }}
+          />
+        </div>
       </div>
 
-      {/* Items Table */}
+      {/* Items Container */}
       <div
         style={{
           backgroundColor: '#FFFFFF',
@@ -601,11 +670,240 @@ export default function AdminMenuPage() {
       >
         {loading && items.length === 0 ? (
           <div style={{ padding: '40px', textAlign: 'center', color: '#64748B' }}>
-            <p style={{ fontSize: '15px', fontWeight: 600 }}>Loading menu items from Supabase...</p>
+            <p style={{ fontSize: '15px', fontWeight: 600 }}>Loading menu items...</p>
           </div>
         ) : filteredItems.length === 0 ? (
           <div style={{ padding: '40px', textAlign: 'center', color: '#64748B' }}>
             <p style={{ fontSize: '15px', fontWeight: 600 }}>No items match your filter</p>
+          </div>
+        ) : viewMode === 'cards' ? (
+          /* ========================================================================= */
+          /* CARD VIEW: Grid of Modern Food Cards                                      */
+          /* ========================================================================= */
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fill, minmax(290px, 1fr))',
+              gap: '18px',
+              padding: '20px'
+            }}
+          >
+            {filteredItems.map(item => {
+              const isToggling = togglingId === item.id;
+              const itemImgUrl = item.image_path ? resolveMediaUrl(item.image_path) : null;
+              const catName = categories.find(c => c.id === item.category_id)?.name || 'Chaiwale';
+              const hasVariants = item.variants && item.variants.length > 0;
+
+              return (
+                <div
+                  key={item.id}
+                  style={{
+                    backgroundColor: '#FFFFFF',
+                    borderRadius: '12px',
+                    border: item.is_available ? '1px solid #E2E8F0' : '1px solid #FECACA',
+                    overflow: 'hidden',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+                    transition: 'transform 0.15s, box-shadow 0.15s',
+                    opacity: item.is_available ? 1 : 0.85
+                  }}
+                >
+                  {/* Card Image Banner */}
+                  <div style={{ position: 'relative', width: '100%', height: '150px', backgroundColor: '#F8FAFC', overflow: 'hidden' }}>
+                    {itemImgUrl ? (
+                      <img
+                        src={itemImgUrl}
+                        alt={item.name}
+                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                        loading="lazy"
+                      />
+                    ) : (
+                      <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '38px', backgroundColor: '#F1F5F9' }}>
+                        🍲
+                      </div>
+                    )}
+
+                    {/* Dietary Badge */}
+                    <div
+                      style={{
+                        position: 'absolute',
+                        top: '10px',
+                        left: '10px',
+                        backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                        backdropFilter: 'blur(4px)',
+                        padding: '3px 8px',
+                        borderRadius: '6px',
+                        fontSize: '11px',
+                        fontWeight: 800,
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                        boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+                        color: item.is_egg ? '#D97706' : item.is_veg ? '#16A34A' : '#DC2626'
+                      }}
+                    >
+                      <span>●</span> {item.is_egg ? 'Egg' : item.is_veg ? 'Pure Veg' : 'Non-Veg'}
+                    </div>
+
+                    {/* Category Pill */}
+                    <div
+                      style={{
+                        position: 'absolute',
+                        top: '10px',
+                        right: '10px',
+                        backgroundColor: 'rgba(15, 23, 42, 0.85)',
+                        color: '#FFFFFF',
+                        padding: '3px 8px',
+                        borderRadius: '6px',
+                        fontSize: '10.5px',
+                        fontWeight: 700
+                      }}
+                    >
+                      {catName}
+                    </div>
+
+                    {/* Out of Stock Overlay Bar */}
+                    {!item.is_available && (
+                      <div
+                        style={{
+                          position: 'absolute',
+                          bottom: 0,
+                          insetInline: 0,
+                          backgroundColor: 'rgba(220, 38, 38, 0.92)',
+                          color: '#FFFFFF',
+                          textAlign: 'center',
+                          fontSize: '11px',
+                          fontWeight: 800,
+                          padding: '4px',
+                          letterSpacing: '0.04em'
+                        }}
+                      >
+                        OUT OF STOCK (PAUSED)
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Card Body */}
+                  <div style={{ padding: '14px 16px', display: 'flex', flexDirection: 'column', flex: 1 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
+                      <h3 style={{ fontSize: '15px', fontWeight: 800, color: '#0F172A', margin: 0, lineHeight: 1.3 }}>
+                        {item.name}
+                      </h3>
+                      {item.spice_level && item.spice_level !== 'NONE' && (
+                        <span title={`Spice level: ${item.spice_level}`} style={{ fontSize: '12px' }}>
+                          {item.spice_level === 'HOT' ? '🌶️🌶️🌶️' : item.spice_level === 'MEDIUM' ? '🌶️🌶️' : '🌶️'}
+                        </span>
+                      )}
+                    </div>
+
+                    {item.description && (
+                      <p
+                        style={{
+                          fontSize: '12px',
+                          color: '#64748B',
+                          margin: '6px 0 10px',
+                          lineHeight: 1.4,
+                          display: '-webkit-box',
+                          WebkitLineClamp: 2,
+                          WebkitBoxOrient: 'vertical',
+                          overflow: 'hidden'
+                        }}
+                      >
+                        {item.description}
+                      </p>
+                    )}
+
+                    {/* Pricing */}
+                    <div style={{ marginTop: 'auto', paddingTop: '10px' }}>
+                      <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px' }}>
+                        <span style={{ fontSize: '18px', fontWeight: 900, color: '#0F172A' }}>
+                          ₹{Number(item.base_price).toFixed(2)}
+                        </span>
+                        {hasVariants && (
+                          <span style={{ fontSize: '11px', color: '#64748B', fontWeight: 600 }}>
+                            (Base Price)
+                          </span>
+                        )}
+                      </div>
+
+                      {hasVariants && (
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '6px' }}>
+                          {item.variants!.map(v => (
+                            <span
+                              key={v.id || v.name}
+                              style={{
+                                fontSize: '10.5px',
+                                padding: '2px 6px',
+                                borderRadius: '4px',
+                                backgroundColor: '#F1F5F9',
+                                color: '#334155',
+                                fontWeight: 700
+                              }}
+                            >
+                              {v.name}: ₹{v.price}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Card Footer: Stock Toggle & Edit */}
+                    <div
+                      style={{
+                        marginTop: '14px',
+                        paddingTop: '12px',
+                        borderTop: '1px solid #F1F5F9',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        gap: '8px'
+                      }}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => handleToggle(item)}
+                        disabled={isToggling}
+                        style={{
+                          flex: 1,
+                          padding: '7px 10px',
+                          borderRadius: '6px',
+                          border: item.is_available ? '1px solid #16A34A' : '1px solid #DC2626',
+                          backgroundColor: item.is_available ? '#DCFCE7' : '#FEE2E2',
+                          color: item.is_available ? '#166534' : '#991B1B',
+                          fontSize: '11.5px',
+                          fontWeight: 800,
+                          cursor: isToggling ? 'not-allowed' : 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '5px'
+                        }}
+                      >
+                        <span>{item.is_available ? '● In Stock' : '✕ Out of Stock'}</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => handleOpenEdit(item)}
+                        style={{
+                          padding: '7px 12px',
+                          borderRadius: '6px',
+                          border: '1px solid #CBD5E1',
+                          backgroundColor: '#F8FAFC',
+                          color: '#334155',
+                          fontSize: '12px',
+                          fontWeight: 700,
+                          cursor: 'pointer'
+                        }}
+                      >
+                        ✏️ Edit
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         ) : (
           <div style={{ overflowX: 'auto' }}>
@@ -756,7 +1054,7 @@ export default function AdminMenuPage() {
                             color: item.is_available ? '#16A34A' : '#DC2626'
                           }}
                         >
-                          {item.is_available ? '● Active in Menu' : '✕ Unavailable (86’d)'}
+                          {item.is_available ? '● In Stock' : '✕ Out of Stock'}
                         </span>
                       </td>
 
@@ -849,7 +1147,7 @@ export default function AdminMenuPage() {
             >
               <div>
                 <span style={{ fontSize: '11px', fontWeight: 800, color: '#B45309', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                  Zomato Partner Menu Manager
+                  Menu Item Details
                 </span>
                 <h2 style={{ fontSize: '19px', fontWeight: 800, color: '#0F172A', margin: '2px 0 0 0' }}>
                   Add New Dish
@@ -955,10 +1253,10 @@ export default function AdminMenuPage() {
                 <div style={{ backgroundColor: '#F8FAFC', padding: '16px', borderRadius: '12px', border: '1px solid #E2E8F0', display: 'flex', flexDirection: 'column' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
                     <label style={{ fontSize: '12px', fontWeight: 700, color: '#334155' }}>
-                      Dish Photo (Supabase Storage)
+                      Dish Photo
                     </label>
                     <span style={{ fontSize: '11px', color: '#059669', fontWeight: 700 }}>
-                      ⚡ Auto-WebP
+                      ⚡ Optimized WebP
                     </span>
                   </div>
 
@@ -1299,7 +1597,7 @@ export default function AdminMenuPage() {
             >
               <div>
                 <span style={{ fontSize: '11px', fontWeight: 800, color: '#B45309', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                  Zomato Partner Menu Manager
+                  Edit Dish Details
                 </span>
                 <h2 style={{ fontSize: '19px', fontWeight: 800, color: '#0F172A', margin: '2px 0 0 0' }}>
                   Edit Dish: {editingItem.name}
@@ -1402,10 +1700,10 @@ export default function AdminMenuPage() {
                 <div style={{ backgroundColor: '#F8FAFC', padding: '16px', borderRadius: '12px', border: '1px solid #E2E8F0', display: 'flex', flexDirection: 'column' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
                     <label style={{ fontSize: '12px', fontWeight: 700, color: '#334155' }}>
-                      Dish Photo (Supabase Storage)
+                      Dish Photo
                     </label>
                     <span style={{ fontSize: '11px', color: '#059669', fontWeight: 700 }}>
-                      ⚡ Auto-WebP
+                      ⚡ Optimized WebP
                     </span>
                   </div>
 

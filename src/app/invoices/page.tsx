@@ -199,7 +199,7 @@ export default function AdminInvoicesPage() {
         <div>
           <h1 style={{ fontSize: '24px', fontWeight: 800, color: '#0F172A' }}>Invoices & Billing History</h1>
           <p style={{ fontSize: '13px', color: '#64748B', marginTop: '2px' }}>
-            Live Supabase Invoice Records, Outstanding Tracking, and Payment Settlement (Admin Audit Hub)
+            Invoice Registry, Outstanding Balance Tracking, and Payment Reconciliation
           </p>
         </div>
         <button
@@ -293,7 +293,7 @@ export default function AdminInvoicesPage() {
       >
         {loading && invoices.length === 0 ? (
           <div style={{ padding: '40px', textAlign: 'center', color: '#64748B' }}>
-            <p style={{ fontSize: '15px', fontWeight: 600 }}>Loading invoices from Supabase...</p>
+            <p style={{ fontSize: '15px', fontWeight: 600 }}>Loading invoices...</p>
           </div>
         ) : filteredInvoices.length === 0 ? (
           <div style={{ padding: '40px', textAlign: 'center', color: '#64748B' }}>
@@ -359,7 +359,7 @@ export default function AdminInvoicesPage() {
                         </span>
                       </td>
                       <td style={{ padding: '14px 16px', color: '#64748B', fontSize: '12px' }}>
-                        {new Date(inv.issued_at).toLocaleDateString('en-IN')}
+                        {new Date(inv.issued_at).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', year: 'numeric' })}
                       </td>
                       <td style={{ padding: '14px 16px', textAlign: 'right' }}>
                         <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
@@ -524,7 +524,7 @@ export default function AdminInvoicesPage() {
                   {viewInvoice.invoice_number}
                 </div>
                 <div style={{ fontSize: '11px', color: '#94A3B8' }}>
-                  {new Date(viewInvoice.issued_at).toLocaleString('en-IN')}
+                  {new Date(viewInvoice.issued_at).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true })}
                 </div>
               </div>
             </div>

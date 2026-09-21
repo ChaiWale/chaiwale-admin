@@ -502,8 +502,7 @@ export function getSalesExcelUrl(): string {
 }
 
 export function getInvoicePdfUrl(invoiceId: string): string {
-  const token = getStoredAuthToken();
-  return `${BACKEND_URL}/api/v1/documents/pdf/invoice/${encodeURIComponent(invoiceId)}?token=${token || ''}`;
+  return `/api/pdf/invoice/${encodeURIComponent(invoiceId)}`;
 }
 
 export function getStatementPdfUrl(clientId: string): string {
@@ -559,7 +558,7 @@ export async function uploadMenuImage(
 
   const json = await res.json();
   if (!res.ok || !json.success) {
-    throw new Error(json.message || 'Image upload to Supabase Storage failed');
+    throw new Error(json.message || 'Image upload failed');
   }
 
   return json.data;
@@ -962,6 +961,48 @@ export async function deleteClientPayment(paymentId: string): Promise<void> {
     const err = await res.json().catch(() => ({}));
     throw new Error(err.message || 'Failed to delete payment');
   }
+}
+
+export interface PromoBannerDto {
+  id: string;
+  badge: string;
+  title: string;
+  description: string;
+  image: string;
+  ctaText: string;
+  ctaLink: string;
+  whatsappNumber?: string;
+  whatsappText?: string;
+  theme?: 'cream' | 'dark' | 'amber';
+  isActive: boolean;
+  order: number;
+}
+
+export async function fetchPromoBanners(): Promise<PromoBannerDto[]> {
+  try {
+    const res = await fetch(`${BACKEND_URL}/api/v1/config/banners`, {
+      cache: 'no-store'
+    });
+    if (!res.ok) return [];
+    const json = await res.json();
+    return json.data || [];
+  } catch (err) {
+    console.error('Failed to fetch promo banners:', err);
+    return [];
+  }
+}
+
+export async function updatePromoBanners(banners: PromoBannerDto[]): Promise<PromoBannerDto[]> {
+  const res = await authFetch(`${BACKEND_URL}/api/v1/config/banners`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ banners })
+  });
+  const json = await res.json();
+  if (!res.ok || !json.success) {
+    throw new Error(json.message || 'Failed to update promo banners');
+  }
+  return json.data;
 }
 
 

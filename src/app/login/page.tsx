@@ -223,7 +223,7 @@ export default function AdminLoginPage() {
             color: '#94A3B8'
           }}
         >
-          Protected by Supabase Auth Token Verification & Role Authorization (RBAC)
+          Protected by Encrypted Token Authentication & Role-Based Access Control
         </div>
       </div>
   );
