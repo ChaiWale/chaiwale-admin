@@ -570,7 +570,10 @@ export default function AdminSettingsPage() {
                         border: '1px solid #E2E8F0',
                         backgroundColor: '#F8FAFC',
                         padding: '20px',
-                        boxShadow: '0 1px 4px rgba(0,0,0,0.03)'
+                        boxShadow: '0 1px 4px rgba(0,0,0,0.03)',
+                        width: '100%',
+                        boxSizing: 'border-box',
+                        overflow: 'hidden'
                       }}
                     >
                       {/* Slide Header */}
@@ -589,10 +592,10 @@ export default function AdminSettingsPage() {
                       </div>
 
                       {/* 2-Column Grid */}
-                      <div style={{ display: 'grid', gridTemplateColumns: '320px 1fr', gap: '24px', alignItems: 'start' }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(240px, 300px) minmax(0, 1fr)', gap: '20px', alignItems: 'start', width: '100%', boxSizing: 'border-box' }}>
                         
                         {/* Left Column: 16:9 Image Preview & Upload */}
-                        <div>
+                        <div style={{ minWidth: 0, boxSizing: 'border-box' }}>
                           <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#334155', marginBottom: '8px' }}>
                             16:9 Showcase Image Preview
                           </label>
@@ -646,7 +649,8 @@ export default function AdminSettingsPage() {
                               alignItems: 'center',
                               justifyContent: 'center',
                               gap: '6px',
-                              marginBottom: '8px'
+                              marginBottom: '8px',
+                              boxSizing: 'border-box'
                             }}
                           >
                             <span>{uploadingHeroIndex === idx ? '⏳ Uploading to Supabase...' : '📁 Upload / Change Image File'}</span>
@@ -658,11 +662,11 @@ export default function AdminSettingsPage() {
                         </div>
 
                         {/* Right Column: Text & CTA Settings */}
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', minWidth: 0, boxSizing: 'border-box' }}>
                           
                           {/* Row 1: Badge & Tagline */}
-                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
-                            <div>
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px', minWidth: 0 }}>
+                            <div style={{ minWidth: 0 }}>
                               <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#334155', marginBottom: '4px' }}>
                                 Pill Badge Text
                               </label>
@@ -671,11 +675,11 @@ export default function AdminSettingsPage() {
                                 value={slide.badge}
                                 onChange={(e) => handleHeroSlideChange(idx, 'badge', e.target.value)}
                                 placeholder="e.g. Chaiwale Flagship Menu"
-                                style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #CBD5E1', fontSize: '13px' }}
+                                style={{ width: '100%', minWidth: 0, boxSizing: 'border-box', padding: '8px 12px', borderRadius: '6px', border: '1px solid #CBD5E1', fontSize: '13px' }}
                               />
                             </div>
 
-                            <div>
+                            <div style={{ minWidth: 0 }}>
                               <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#334155', marginBottom: '4px' }}>
                                 Sub-tag
                               </label>
@@ -684,14 +688,14 @@ export default function AdminSettingsPage() {
                                 value={slide.tag}
                                 onChange={(e) => handleHeroSlideChange(idx, 'tag', e.target.value)}
                                 placeholder="e.g. Chai, Snacks & All-Day Adda"
-                                style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #CBD5E1', fontSize: '13px' }}
+                                style={{ width: '100%', minWidth: 0, boxSizing: 'border-box', padding: '8px 12px', borderRadius: '6px', border: '1px solid #CBD5E1', fontSize: '13px' }}
                               />
                             </div>
                           </div>
 
                           {/* Row 2: Headline & Headline Accent */}
-                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
-                            <div>
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px', minWidth: 0 }}>
+                            <div style={{ minWidth: 0 }}>
                               <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#334155', marginBottom: '4px' }}>
                                 Main Headline Line 1
                               </label>
@@ -700,11 +704,11 @@ export default function AdminSettingsPage() {
                                 value={slide.headline}
                                 onChange={(e) => handleHeroSlideChange(idx, 'headline', e.target.value)}
                                 placeholder="e.g. Dilli Ka Dilchasp Swad,"
-                                style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #CBD5E1', fontSize: '13px', fontWeight: 600 }}
+                                style={{ width: '100%', minWidth: 0, boxSizing: 'border-box', padding: '8px 12px', borderRadius: '6px', border: '1px solid #CBD5E1', fontSize: '13px', fontWeight: 600 }}
                               />
                             </div>
 
-                            <div>
+                            <div style={{ minWidth: 0 }}>
                               <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#D96B27', marginBottom: '4px' }}>
                                 Highlight Headline Line 2 (Gradient Text)
                               </label>
@@ -713,13 +717,13 @@ export default function AdminSettingsPage() {
                                 value={slide.headlineAccent}
                                 onChange={(e) => handleHeroSlideChange(idx, 'headlineAccent', e.target.value)}
                                 placeholder="e.g. Har Pal, Har Bite Me."
-                                style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #CBD5E1', fontSize: '13px', fontWeight: 700, color: '#D96B27' }}
+                                style={{ width: '100%', minWidth: 0, boxSizing: 'border-box', padding: '8px 12px', borderRadius: '6px', border: '1px solid #CBD5E1', fontSize: '13px', fontWeight: 700, color: '#D96B27' }}
                               />
                             </div>
                           </div>
 
                           {/* Row 3: Subtitle Description */}
-                          <div>
+                          <div style={{ minWidth: 0 }}>
                             <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#334155', marginBottom: '4px' }}>
                               Description Paragraph
                             </label>
@@ -728,63 +732,63 @@ export default function AdminSettingsPage() {
                               value={slide.sub}
                               onChange={(e) => handleHeroSlideChange(idx, 'sub', e.target.value)}
                               placeholder="Describe this offering in 1-2 engaging sentences..."
-                              style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #CBD5E1', fontSize: '13px', lineHeight: 1.5 }}
+                              style={{ width: '100%', minWidth: 0, boxSizing: 'border-box', padding: '8px 12px', borderRadius: '6px', border: '1px solid #CBD5E1', fontSize: '13px', lineHeight: 1.5 }}
                             />
                           </div>
 
                           {/* Row 4: CTAs */}
-                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
-                            <div>
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '14px', minWidth: 0 }}>
+                            <div style={{ minWidth: 0 }}>
                               <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#334155', marginBottom: '4px' }}>
                                 Primary Button Label & Link
                               </label>
-                              <div style={{ display: 'flex', gap: '8px' }}>
+                              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', minWidth: 0 }}>
                                 <input
                                   type="text"
                                   value={slide.primaryCtaLabel}
                                   onChange={(e) => handleHeroSlideChange(idx, 'primaryCtaLabel', e.target.value)}
                                   placeholder="e.g. Explore Full Menu"
-                                  style={{ flex: 1, padding: '7px 10px', borderRadius: '6px', border: '1px solid #CBD5E1', fontSize: '12.5px' }}
+                                  style={{ width: '100%', minWidth: 0, boxSizing: 'border-box', padding: '7px 10px', borderRadius: '6px', border: '1px solid #CBD5E1', fontSize: '12px' }}
                                 />
                                 <input
                                   type="text"
                                   value={slide.primaryCtaHref}
                                   onChange={(e) => handleHeroSlideChange(idx, 'primaryCtaHref', e.target.value)}
                                   placeholder="e.g. /menu"
-                                  style={{ flex: 1, padding: '7px 10px', borderRadius: '6px', border: '1px solid #CBD5E1', fontSize: '12.5px' }}
+                                  style={{ width: '100%', minWidth: 0, boxSizing: 'border-box', padding: '7px 10px', borderRadius: '6px', border: '1px solid #CBD5E1', fontSize: '12px' }}
                                 />
                               </div>
                             </div>
 
-                            <div>
+                            <div style={{ minWidth: 0 }}>
                               <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#15803D', marginBottom: '4px' }}>
                                 WhatsApp Button Label & URL
                               </label>
-                              <div style={{ display: 'flex', gap: '8px' }}>
+                              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', minWidth: 0 }}>
                                 <input
                                   type="text"
                                   value={slide.waCtaLabel}
                                   onChange={(e) => handleHeroSlideChange(idx, 'waCtaLabel', e.target.value)}
                                   placeholder="e.g. Order on WhatsApp"
-                                  style={{ flex: 1, padding: '7px 10px', borderRadius: '6px', border: '1px solid #CBD5E1', fontSize: '12.5px' }}
+                                  style={{ width: '100%', minWidth: 0, boxSizing: 'border-box', padding: '7px 10px', borderRadius: '6px', border: '1px solid #CBD5E1', fontSize: '12px' }}
                                 />
                                 <input
                                   type="text"
                                   value={slide.waCtaHref}
                                   onChange={(e) => handleHeroSlideChange(idx, 'waCtaHref', e.target.value)}
                                   placeholder="https://wa.me/..."
-                                  style={{ flex: 1, padding: '7px 10px', borderRadius: '6px', border: '1px solid #CBD5E1', fontSize: '12.5px' }}
+                                  style={{ width: '100%', minWidth: 0, boxSizing: 'border-box', padding: '7px 10px', borderRadius: '6px', border: '1px solid #CBD5E1', fontSize: '12px' }}
                                 />
                               </div>
                             </div>
                           </div>
 
                           {/* Row 5: 3 Highlights Bullets */}
-                          <div>
+                          <div style={{ minWidth: 0 }}>
                             <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#334155', marginBottom: '4px' }}>
                               3 Key Highlights (Bullets with checkmarks)
                             </label>
-                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '8px', minWidth: 0 }}>
                               {[0, 1, 2].map((bIdx) => (
                                 <input
                                   key={`b-${idx}-${bIdx}`}
@@ -792,11 +796,12 @@ export default function AdminSettingsPage() {
                                   value={slide.highlights?.[bIdx] || ''}
                                   onChange={(e) => handleHeroHighlightChange(idx, bIdx, e.target.value)}
                                   placeholder={`Highlight #${bIdx + 1}`}
-                                  style={{ padding: '7px 10px', borderRadius: '6px', border: '1px solid #CBD5E1', fontSize: '12px' }}
+                                  style={{ width: '100%', minWidth: 0, boxSizing: 'border-box', padding: '7px 10px', borderRadius: '6px', border: '1px solid #CBD5E1', fontSize: '12px' }}
                                 />
                               ))}
                             </div>
                           </div>
+
                         </div>
                       </div>
                     </div>
