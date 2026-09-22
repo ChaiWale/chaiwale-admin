@@ -344,6 +344,20 @@ export async function updateOrderStatus(orderId: string, status: string): Promis
 }
 
 /**
+ * Permanently delete an order (Admin only)
+ */
+export async function deleteOrder(orderId: string): Promise<boolean> {
+  const res = await authFetch(`${BACKEND_URL}/api/v1/orders/${encodeURIComponent(orderId)}`, {
+    method: 'DELETE'
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.message || 'Failed to delete order');
+  }
+  return true;
+}
+
+/**
  * Fetch catering leads (Manager / Admin)
  */
 export async function fetchCateringLeads(limit = 25): Promise<CateringLeadDto[]> {

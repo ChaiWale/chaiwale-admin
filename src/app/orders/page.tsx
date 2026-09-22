@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { fetchRecentOrders, updateOrderStatus, verifyOrderPayment, AdminOrderDto } from '../../services/admin-api.client';
+import { fetchRecentOrders, updateOrderStatus, verifyOrderPayment, deleteOrder, AdminOrderDto } from '../../services/admin-api.client';
 import { buildWhatsAppUrl, WhatsAppTemplates } from '../../utils/whatsapp';
 import { ThermalReceiptModal, ThermalReceiptData } from '../../components/ThermalReceiptModal';
 
@@ -65,6 +65,21 @@ export default function AdminOrdersPage() {
       setTimeout(() => setActionSuccess(null), 3000);
     } catch (err: any) {
       alert(`Payment verification failed: ${err.message}`);
+    } finally {
+      setUpdatingId(null);
+    }
+  };
+
+  const handleDeleteOrder = async (order: AdminOrderDto) => {
+    if (!confirm(`Permanently delete order #${order.order_number}?\n\nThis cannot be undone.`)) return;
+    setUpdatingId(order.id);
+    try {
+      await deleteOrder(order.id);
+      setOrders(prev => prev.filter(o => o.id !== order.id));
+      setActionSuccess(`Order #${order.order_number} permanently deleted`);
+      setTimeout(() => setActionSuccess(null), 4000);
+    } catch (err: any) {
+      alert(`Delete failed: ${err.message}`);
     } finally {
       setUpdatingId(null);
     }
@@ -538,6 +553,28 @@ export default function AdminOrdersPage() {
                               title="Print / View Kitchen Order Ticket (KOT)"
                             >
                               🍳 KOT
+                            </button>
+
+                            {/* 🗑️ Delete Order — Admin only */}
+                            <button
+                              onClick={() => handleDeleteOrder(order)}
+                              disabled={isUpdating}
+                              style={{
+                                padding: '4px 8px',
+                                backgroundColor: '#7F1D1D',
+                                color: '#FFFFFF',
+                                border: 'none',
+                                borderRadius: 'var(--cw-radius-md)',
+                                fontSize: '11px',
+                                fontWeight: 700,
+                                cursor: isUpdating ? 'not-allowed' : 'pointer',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '3px'
+                              }}
+                              title="Permanently delete this order (admin only)"
+                            >
+                              🗑️
                             </button>
 
                             {/* WhatsApp Chat — only renders when customer has a valid phone */}
