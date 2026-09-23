@@ -516,7 +516,7 @@ export function getSalesExcelUrl(): string {
 }
 
 export function getInvoicePdfUrl(invoiceId: string): string {
-  return `${BACKEND_URL}/api/v1/documents/pdf/invoice/${encodeURIComponent(invoiceId)}`;
+  return `/api/pdf/invoice/${encodeURIComponent(invoiceId)}`;
 }
 
 export function getStatementPdfUrl(clientId: string): string {
