@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { fetchRecentOrders, updateOrderStatus, verifyOrderPayment, deleteOrder, AdminOrderDto } from '../../services/admin-api.client';
+import { fetchRecentOrders, updateOrderStatus, verifyOrderPayment, deleteOrder, getInvoicePdfUrl, AdminOrderDto } from '../../services/admin-api.client';
 import { buildWhatsAppUrl, WhatsAppTemplates } from '../../utils/whatsapp';
 import { ThermalReceiptModal, ThermalReceiptData } from '../../components/ThermalReceiptModal';
 
@@ -306,10 +306,33 @@ export default function AdminOrdersPage() {
                     >
                       {/* Order Number & Timestamp */}
                       <td style={{ padding: '16px' }}>
-                        <div style={{ fontWeight: 700, color: '#1E2328', fontFamily: 'monospace', fontSize: '13px' }}>
-                          {order.order_number}
+                        <div>
+                          <a
+                            href={getInvoicePdfUrl(order.order_number)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            style={{
+                              fontWeight: 800,
+                              color: '#1D4ED8',
+                              fontFamily: 'monospace',
+                              fontSize: '13px',
+                              textDecoration: 'none',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                              padding: '2px 8px',
+                              borderRadius: '6px',
+                              backgroundColor: '#EFF6FF',
+                              border: '1px solid #BFDBFE',
+                              cursor: 'pointer',
+                              transition: 'all 0.15s ease'
+                            }}
+                            title="Click to view & download official Tax Invoice (PDF)"
+                          >
+                            📄 {order.order_number} ↗
+                          </a>
                         </div>
-                        <div style={{ fontSize: '11px', color: '#94A3B8', marginTop: '2px' }}>
+                        <div style={{ fontSize: '11px', color: '#94A3B8', marginTop: '4px' }}>
                           {new Date(order.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} •{' '}
                           {new Date(order.created_at).toLocaleDateString([], { month: 'short', day: 'numeric' })}
                         </div>
@@ -471,29 +494,62 @@ export default function AdminOrdersPage() {
                             </div>
                           )}
 
-                          <select
-                            value={order.status}
-                            disabled={isUpdating}
-                            onChange={e => handleStatusChange(order.id, e.target.value)}
-                            style={{
-                              padding: '6px 10px',
-                              borderRadius: 'var(--cw-radius-md)',
-                              border: '1px solid var(--cw-color-border)',
-                              fontSize: '12px',
-                              fontWeight: 600,
-                              backgroundColor: '#FFFFFF',
-                              color: '#1E2328',
-                              cursor: isUpdating ? 'not-allowed' : 'pointer'
-                            }}
-                          >
-                            <option value="NEW">Set: New</option>
-                            <option value="CONFIRMED">Set: Confirmed</option>
-                            <option value="PREPARING">Set: Preparing</option>
-                            <option value="READY">Set: Ready</option>
-                            <option value="OUT_FOR_DELIVERY">Set: Out for Delivery</option>
-                            <option value="DELIVERED">Set: Delivered</option>
-                            <option value="CANCELLED">Set: Cancelled</option>
-                          </select>
+                          {order.status === 'COMPLETED' || order.status === 'DELIVERED' ? (
+                            <div
+                              style={{
+                                padding: '6px 10px',
+                                borderRadius: 'var(--cw-radius-md)',
+                                fontSize: '11px',
+                                fontWeight: 700,
+                                backgroundColor: '#DCFCE7',
+                                color: '#16A34A',
+                                border: '1px solid #BBF7D0',
+                                textAlign: 'center'
+                              }}
+                            >
+                              ✓ Fulfilled (Delivered)
+                            </div>
+                          ) : order.status === 'CANCELLED' ? (
+                            <div
+                              style={{
+                                padding: '6px 10px',
+                                borderRadius: 'var(--cw-radius-md)',
+                                fontSize: '11px',
+                                fontWeight: 700,
+                                backgroundColor: '#FEE2E2',
+                                color: '#DC2626',
+                                border: '1px solid #FECACA',
+                                textAlign: 'center'
+                              }}
+                            >
+                              ✕ Cancelled
+                            </div>
+                          ) : (
+                            <select
+                              value={order.status}
+                              disabled={isUpdating}
+                              onChange={e => handleStatusChange(order.id, e.target.value)}
+                              style={{
+                                padding: '6px 10px',
+                                borderRadius: 'var(--cw-radius-md)',
+                                border: '1px solid var(--cw-color-border)',
+                                fontSize: '12px',
+                                fontWeight: 600,
+                                backgroundColor: '#FFFFFF',
+                                color: '#1E2328',
+                                cursor: isUpdating ? 'not-allowed' : 'pointer'
+                              }}
+                            >
+                              <option value="NEW">Set: New</option>
+                              <option value="CONFIRMED">Set: Confirmed</option>
+                              <option value="PREPARING">Set: Preparing</option>
+                              <option value="READY">Set: Ready</option>
+                              <option value="OUT_FOR_DELIVERY">Set: Out for Delivery</option>
+                              <option value="DELIVERED">Set: Delivered</option>
+                              <option value="CANCELLED">Set: Cancelled</option>
+                            </select>
+                          )}
+
 
                           <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
                             {order.payment_mode === 'UPI' && order.payment_status !== 'PAID' && (
@@ -534,6 +590,28 @@ export default function AdminOrdersPage() {
                             >
                               🧾 Bill
                             </button>
+
+                            <a
+                              href={getInvoicePdfUrl(order.order_number)}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              style={{
+                                padding: '4px 8px',
+                                backgroundColor: '#1D4ED8',
+                                color: '#FFFFFF',
+                                border: 'none',
+                                borderRadius: 'var(--cw-radius-md)',
+                                fontSize: '11px',
+                                fontWeight: 700,
+                                textDecoration: 'none',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '3px'
+                              }}
+                              title="View / Download Official Tax Invoice (PDF)"
+                            >
+                              📄 PDF
+                            </a>
 
                             <button
                               onClick={() => handleOpenReceiptModal(order, 'KOT')}

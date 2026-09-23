@@ -516,7 +516,7 @@ export function getSalesExcelUrl(): string {
 }
 
 export function getInvoicePdfUrl(invoiceId: string): string {
-  return `/api/pdf/invoice/${encodeURIComponent(invoiceId)}`;
+  return `${BACKEND_URL}/api/v1/documents/pdf/invoice/${encodeURIComponent(invoiceId)}`;
 }
 
 export function getStatementPdfUrl(clientId: string): string {
@@ -1065,6 +1065,56 @@ export async function updateHeroSlides(slides: HeroSlideDto[]): Promise<HeroSlid
   }
   return json.data;
 }
+
+export interface StoreProfileDto {
+  store_name: string;
+  tagline: string;
+  address: string;
+  phone: string;
+  whatsapp: string;
+  email: string;
+  upi_id: string;
+  opening_time?: string;
+  closing_time?: string;
+}
+
+export async function fetchStoreProfile(): Promise<StoreProfileDto> {
+  const res = await fetch(`${BACKEND_URL}/api/v1/config/store-profile`, {
+    cache: 'no-store'
+  });
+  const json = await res.json();
+  if (!res.ok || !json.success) {
+    throw new Error(json.message || 'Failed to fetch store profile');
+  }
+  return json.data;
+}
+
+export async function updateStoreProfile(profile: Partial<StoreProfileDto>): Promise<StoreProfileDto> {
+  const res = await authFetch(`${BACKEND_URL}/api/v1/config/store-profile`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(profile)
+  });
+  const json = await res.json();
+  if (!res.ok || !json.success) {
+    throw new Error(json.message || 'Failed to update store profile');
+  }
+  return json.data;
+}
+
+export async function deleteInvoice(invoiceId: string): Promise<boolean> {
+  const res = await authFetch(`${BACKEND_URL}/api/v1/billing/invoices/${encodeURIComponent(invoiceId)}`, {
+    method: 'DELETE'
+  });
+  const json = await res.json();
+  if (!res.ok || !json.success) {
+    throw new Error(json.message || 'Failed to delete invoice');
+  }
+  return true;
+}
+
+
+
 
 
 

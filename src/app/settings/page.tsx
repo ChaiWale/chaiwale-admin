@@ -6,7 +6,9 @@ import {
   updateHeroSlides,
   HeroSlideDto,
   uploadMenuImage,
-  resolveMediaUrl
+  resolveMediaUrl,
+  fetchStoreProfile,
+  updateStoreProfile
 } from '../../services/admin-api.client';
 
 interface StoreSettingsState {
@@ -26,7 +28,7 @@ interface StoreSettingsState {
 
 const DEFAULT_SETTINGS: StoreSettingsState = {
   storeName: 'Chaiwale',
-  tagline: 'Sip, Bite, Repeat • Authentic Chai & Handcrafted Indian Snacks',
+  tagline: 'Taste of Desi Swag • Cafe & Refreshments',
   address: 'G-31, Vardhman Grand Plaza, Mangalam Place, M2K Road, Rohini Sector-3, New Delhi – 110085',
   phone: '+91 93101 12564',
   whatsapp: '919310112564',
@@ -39,12 +41,11 @@ const DEFAULT_SETTINGS: StoreSettingsState = {
   currency: 'INR (₹)'
 };
 
-const STORAGE_KEY = 'chaiwale_admin_store_settings';
-
 export default function AdminSettingsPage() {
   const [activeTab, setActiveTab] = useState<'store' | 'hero'>('store');
   const [settings, setSettings] = useState<StoreSettingsState>(DEFAULT_SETTINGS);
   const [savedFeedback, setSavedFeedback] = useState<string | null>(null);
+  const [savingStore, setSavingStore] = useState<boolean>(false);
 
   // Homepage Hero Showcase State
   const [heroSlides, setHeroSlides] = useState<HeroSlideDto[]>([]);
@@ -54,18 +55,33 @@ export default function AdminSettingsPage() {
   const [uploadingHeroIndex, setUploadingHeroIndex] = useState<number | null>(null);
 
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const stored = localStorage.getItem(STORAGE_KEY);
-      if (stored) {
-        try {
-          setSettings(JSON.parse(stored));
-        } catch {
-          // fallback to default
-        }
-      }
-    }
+    loadStoreProfile();
     loadHeroSlides();
   }, []);
+
+  const loadStoreProfile = async () => {
+    try {
+      const data = await fetchStoreProfile();
+      if (data) {
+        setSettings({
+          storeName: data.store_name || DEFAULT_SETTINGS.storeName,
+          tagline: data.tagline || DEFAULT_SETTINGS.tagline,
+          address: data.address || DEFAULT_SETTINGS.address,
+          phone: data.phone || DEFAULT_SETTINGS.phone,
+          whatsapp: data.whatsapp || DEFAULT_SETTINGS.whatsapp,
+          email: data.email || DEFAULT_SETTINGS.email,
+          openingTime: data.opening_time || DEFAULT_SETTINGS.openingTime,
+          closingTime: data.closing_time || DEFAULT_SETTINGS.closingTime,
+          isOpen: true,
+          upiId: data.upi_id || DEFAULT_SETTINGS.upiId,
+          taxMode: DEFAULT_SETTINGS.taxMode,
+          currency: DEFAULT_SETTINGS.currency
+        });
+      }
+    } catch (err: any) {
+      console.warn('Could not load store profile from database, using defaults:', err.message);
+    }
+  };
 
   const loadHeroSlides = async () => {
     setLoadingHero(true);
@@ -83,14 +99,30 @@ export default function AdminSettingsPage() {
     setSettings((prev) => ({ ...prev, [field]: value }));
   };
 
-  const handleSaveStore = (e: React.FormEvent) => {
+  const handleSaveStore = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (typeof window !== 'undefined') {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
+    setSavingStore(true);
+    try {
+      await updateStoreProfile({
+        store_name: settings.storeName,
+        tagline: settings.tagline,
+        address: settings.address,
+        phone: settings.phone,
+        whatsapp: settings.whatsapp,
+        email: settings.email,
+        upi_id: settings.upiId,
+        opening_time: settings.openingTime,
+        closing_time: settings.closingTime
+      });
+      setSavedFeedback('Store & operational settings saved successfully to central database!');
+      setTimeout(() => setSavedFeedback(null), 3500);
+    } catch (err: any) {
+      alert(`Failed to save settings: ${err.message}`);
+    } finally {
+      setSavingStore(false);
     }
-    setSavedFeedback('Store & operational settings saved successfully!');
-    setTimeout(() => setSavedFeedback(null), 3500);
   };
+
 
   // Hero Showcase Handlers
   const handleHeroSlideChange = (index: number, field: keyof HeroSlideDto, value: any) => {
