@@ -15,6 +15,7 @@ import {
   ClientOfficeDto,
   ClientStatementDto
 } from '../../services/admin-api.client';
+import ChaiLoader from '@/components/ChaiLoader';
 
 export default function AdminClientsPage() {
   const [clients, setClients] = useState<ClientOfficeDto[]>([]);
@@ -657,9 +658,8 @@ export default function AdminClientsPage() {
         }}
       >
         {loading ? (
-          <div style={{ padding: '60px 20px', textAlign: 'center', color: '#64748B' }}>
-            <div style={{ fontSize: '24px', marginBottom: '12px' }}>⏳</div>
-            <div style={{ fontWeight: 600 }}>Loading client accounts and PINs...</div>
+          <div style={{ padding: '40px 20px', textAlign: 'center' }}>
+            <ChaiLoader label="Loading Clients & Khata..." sublabel="Fetching real-time balances, consumption & PINs..." />
           </div>
         ) : filteredClients.length === 0 ? (
           <div style={{ padding: '60px 20px', textAlign: 'center', color: '#64748B' }}>
