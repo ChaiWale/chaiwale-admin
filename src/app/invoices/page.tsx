@@ -11,6 +11,7 @@ import {
   InvoiceDetailDto
 } from '../../services/admin-api.client';
 import { buildWhatsAppUrl, WhatsAppTemplates } from '../../utils/whatsapp';
+import ChaiLoader from '../../components/ChaiLoader';
 
 export default function AdminInvoicesPage() {
   const [invoices, setInvoices] = useState<InvoiceRecordDto[]>([]);
@@ -292,8 +293,8 @@ export default function AdminInvoicesPage() {
         }}
       >
         {loading && invoices.length === 0 ? (
-          <div style={{ padding: '40px', textAlign: 'center', color: '#64748B' }}>
-            <p style={{ fontSize: '15px', fontWeight: 600 }}>Loading invoices...</p>
+          <div style={{ padding: '40px 20px', display: 'flex', justifyContent: 'center' }}>
+            <ChaiLoader label="Loading Invoices..." sublabel="Fetching official GST & counter invoices..." />
           </div>
         ) : filteredInvoices.length === 0 ? (
           <div style={{ padding: '40px', textAlign: 'center', color: '#64748B' }}>

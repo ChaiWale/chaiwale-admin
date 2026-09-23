@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { fetchCateringLeads, updateCateringLeadStatus, recordCateringAdvance, CateringLeadDto } from '../../services/admin-api.client';
 import { buildWhatsAppUrl, WhatsAppTemplates } from '../../utils/whatsapp';
+import ChaiLoader from '../../components/ChaiLoader';
 
 export default function AdminCateringPage() {
   const [leads, setLeads] = useState<CateringLeadDto[]>([]);
@@ -250,8 +251,8 @@ export default function AdminCateringPage() {
         }}
       >
         {loading && leads.length === 0 ? (
-          <div style={{ padding: '40px', textAlign: 'center', color: '#64748B' }}>
-            <p style={{ fontSize: '15px', fontWeight: 600 }}>Loading catering inquiries...</p>
+          <div style={{ padding: '40px 20px', display: 'flex', justifyContent: 'center' }}>
+            <ChaiLoader label="Loading Catering Leads..." sublabel="Fetching corporate & event catering inquiries..." />
           </div>
         ) : filteredLeads.length === 0 ? (
           <div style={{ padding: '40px', textAlign: 'center', color: '#64748B' }}>

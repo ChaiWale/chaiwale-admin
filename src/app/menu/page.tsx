@@ -14,6 +14,7 @@ import {
   CategoryDto,
   MenuItemVariantDto
 } from '../../services/admin-api.client';
+import ChaiLoader from '../../components/ChaiLoader';
 import { compressAndConvertToWebP, formatBytes } from '../../utils/image-compressor';
 
 const POPULAR_TAG_OPTIONS = [
@@ -669,8 +670,8 @@ export default function AdminMenuPage() {
         }}
       >
         {loading && items.length === 0 ? (
-          <div style={{ padding: '40px', textAlign: 'center', color: '#64748B' }}>
-            <p style={{ fontSize: '15px', fontWeight: 600 }}>Loading menu items...</p>
+          <div style={{ padding: '40px 20px', display: 'flex', justifyContent: 'center' }}>
+            <ChaiLoader label="Loading Menu Catalog..." sublabel="Fetching authentic dishes & categories..." />
           </div>
         ) : filteredItems.length === 0 ? (
           <div style={{ padding: '40px', textAlign: 'center', color: '#64748B' }}>

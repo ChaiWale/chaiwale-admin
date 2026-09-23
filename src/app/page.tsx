@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { fetchDashboardStats, fetchRecentOrders, getSalesExcelUrl, DashboardStatsDto, AdminOrderDto } from '../services/admin-api.client';
+import ChaiLoader from '../components/ChaiLoader';
 
 export default function AdminDashboardPage() {
   const [stats, setStats] = useState<DashboardStatsDto | null>(null);
@@ -106,6 +107,14 @@ export default function AdminDashboardPage() {
       color: '#D97706'
     }
   ];
+
+  if (loading && !stats) {
+    return (
+      <div style={{ minHeight: '65vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <ChaiLoader label="Loading Operations Dashboard..." sublabel="Calculating live revenues, order counts & pipeline metrics..." />
+      </div>
+    );
+  }
 
   return (
     <div>

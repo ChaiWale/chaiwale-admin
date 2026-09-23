@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { fetchLedger, getSalesExcelUrl, LedgerRecordDto } from '../../services/admin-api.client';
+import ChaiLoader from '../../components/ChaiLoader';
 
 export default function AdminLedgerPage() {
   const [entries, setEntries] = useState<LedgerRecordDto[]>([]);
@@ -169,8 +170,8 @@ export default function AdminLedgerPage() {
         }}
       >
         {loading && entries.length === 0 ? (
-          <div style={{ padding: '40px', textAlign: 'center', color: '#64748B' }}>
-            <p style={{ fontSize: '15px', fontWeight: 600 }}>Loading ledger entries...</p>
+          <div style={{ padding: '40px 20px', display: 'flex', justifyContent: 'center' }}>
+            <ChaiLoader label="Loading Khata Ledger..." sublabel="Fetching customer balances & transaction entries..." />
           </div>
         ) : filteredEntries.length === 0 ? (
           <div style={{ padding: '40px', textAlign: 'center', color: '#64748B' }}>
