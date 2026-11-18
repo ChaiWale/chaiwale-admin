@@ -356,12 +356,36 @@ export default function AdminOrdersPage() {
 
                       {/* Customer & Address */}
                       <td style={{ padding: '16px' }}>
-                        <div style={{ fontWeight: 600, color: '#1E2328' }}>
+                        <div style={{ fontWeight: 700, color: '#0F172A', fontSize: '14px' }}>
                           {order.customer_name || 'Walk-in Guest'}
                         </div>
+                        {order.customer_phone && (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '4px' }}>
+                            <a
+                              href={`tel:${order.customer_phone}`}
+                              style={{ fontSize: '12px', color: '#1D4ED8', textDecoration: 'none', fontWeight: 600 }}
+                            >
+                              📞 {order.customer_phone}
+                            </a>
+                            <a
+                              href={`https://wa.me/${order.customer_phone.replace(/\D/g, '').length === 10 ? '91' + order.customer_phone.replace(/\D/g, '') : order.customer_phone.replace(/\D/g, '')}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              style={{ fontSize: '11px', color: '#16A34A', fontWeight: 700, textDecoration: 'none', backgroundColor: '#DCFCE7', padding: '1px 5px', borderRadius: '4px' }}
+                              title="Chat with customer on WhatsApp"
+                            >
+                              💬 WA
+                            </a>
+                          </div>
+                        )}
                         {order.delivery_address && (
-                          <div style={{ fontSize: '11px', color: '#64748B', marginTop: '2px', maxWidth: '220px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={order.delivery_address}>
-                            📍 {order.delivery_address}
+                          <div style={{ fontSize: '11.5px', color: '#475569', marginTop: '4px', maxWidth: '240px', lineHeight: 1.3 }} title={order.delivery_address}>
+                            📍 <strong>Location:</strong> {order.delivery_address}
+                          </div>
+                        )}
+                        {order.special_instructions && (
+                          <div style={{ fontSize: '11px', color: '#D97706', marginTop: '4px', maxWidth: '240px', fontStyle: 'italic' }}>
+                            📝 Note: {order.special_instructions}
                           </div>
                         )}
                       </td>

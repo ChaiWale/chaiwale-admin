@@ -32,7 +32,9 @@ export interface AdminOrderDto {
   order_number: string;
   order_type: string;
   customer_name?: string;
+  customer_phone?: string;
   delivery_address?: string;
+  special_instructions?: string;
   subtotal: number;
   tax_amount: number;
   discount_amount: number;
