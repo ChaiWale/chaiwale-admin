@@ -1467,34 +1467,6 @@ export default function AdminOrdersPage() {
                       🗑️
                     </button>
                   </div>
-
-                  {/* Manual Status Override Select */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                    <span style={{ fontSize: '10.5px', color: '#94A3B8' }}>Set:</span>
-                    <select
-                      value={order.status}
-                      disabled={isUpdating}
-                      onChange={e => handleStatusChange(order.id, e.target.value)}
-                      style={{
-                        padding: '4px 6px',
-                        borderRadius: '6px',
-                        border: '1px solid #CBD5E1',
-                        fontSize: '11px',
-                        fontWeight: 600,
-                        backgroundColor: '#FFFFFF',
-                        color: '#334155',
-                        cursor: isUpdating ? 'not-allowed' : 'pointer'
-                      }}
-                    >
-                      <option value="PENDING">Pending</option>
-                      <option value="CONFIRMED">Confirmed</option>
-                      <option value="PREPARING">Preparing</option>
-                      <option value="READY">Ready</option>
-                      <option value="OUT_FOR_DELIVERY">Out for Delivery</option>
-                      <option value="DELIVERED">Delivered</option>
-                      <option value="CANCELLED">Cancelled</option>
-                    </select>
-                  </div>
                 </div>
               </div>
             );
