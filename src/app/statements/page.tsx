@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { fetchInvoices, getSalesExcelUrl, InvoiceRecordDto } from '../../services/admin-api.client';
 
 export default function AdminStatementsPage() {
@@ -8,13 +8,14 @@ export default function AdminStatementsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const [dateFilter, setDateFilter] = useState<'all' | 'today' | 'yesterday' | 'week' | 'month'>('all');
   const [searchQuery, setSearchQuery] = useState('');
 
   const loadInvoices = async () => {
     setLoading(true);
     setError(null);
     try {
-      const data = await fetchInvoices({ limit: 100 });
+      const data = await fetchInvoices({ limit: 200 });
       setInvoices(data);
     } catch (err: any) {
       setError(err.message || 'Failed to load statement data');
@@ -27,28 +28,74 @@ export default function AdminStatementsPage() {
     loadInvoices();
   }, []);
 
-  const filteredInvoices = invoices.filter((inv) => {
-    const rawQuery = searchQuery.toLowerCase().trim();
-    const keywords = rawQuery ? rawQuery.split(/\s+/).filter(Boolean) : [];
-    if (keywords.length === 0) return true;
+  // Date Filter Evaluator
+  const isWithinDateFilter = (dateStr: string, filter: 'all' | 'today' | 'yesterday' | 'week' | 'month') => {
+    if (filter === 'all') return true;
+    try {
+      const d = new Date(dateStr);
+      const now = new Date();
+      const pad = (n: number) => String(n).padStart(2, '0');
+      const dateKey = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+      const todayKey = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
 
-    const searchable = [
-      inv.invoice_number,
-      inv.invoice_type || '',
-      inv.status || '',
-      inv.issued_at || '',
-      inv.grand_total?.toString() || '',
-      inv.paid_amount?.toString() || '',
-      inv.outstanding_amount?.toString() || ''
-    ].join(' ').toLowerCase();
+      const y = new Date(now);
+      y.setDate(y.getDate() - 1);
+      const yesterdayKey = `${y.getFullYear()}-${pad(y.getMonth() + 1)}-${pad(y.getDate())}`;
 
-    return keywords.every((kw) => searchable.includes(kw));
-  });
+      if (filter === 'today') return dateKey === todayKey;
+      if (filter === 'yesterday') return dateKey === yesterdayKey;
+      if (filter === 'week') {
+        const diffMs = now.getTime() - d.getTime();
+        const diffDays = diffMs / (1000 * 60 * 60 * 24);
+        return diffDays >= 0 && diffDays <= 7;
+      }
+      if (filter === 'month') {
+        return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+      }
+    } catch {}
+    return true;
+  };
 
-  const totalSales = invoices.reduce((a, c) => a + Number(c.grand_total || 0), 0);
-  const totalPaid = invoices.reduce((a, c) => a + Number(c.paid_amount || 0), 0);
-  const totalOutstanding = invoices.reduce((a, c) => a + Number(c.outstanding_amount || 0), 0);
-  const totalInvoicesCount = invoices.length;
+  // Date Counts
+  const dateCounts = useMemo(() => {
+    return {
+      all: invoices.length,
+      today: invoices.filter(i => isWithinDateFilter(i.issued_at || (i as any).created_at, 'today')).length,
+      yesterday: invoices.filter(i => isWithinDateFilter(i.issued_at || (i as any).created_at, 'yesterday')).length,
+      week: invoices.filter(i => isWithinDateFilter(i.issued_at || (i as any).created_at, 'week')).length,
+      month: invoices.filter(i => isWithinDateFilter(i.issued_at || (i as any).created_at, 'month')).length
+    };
+  }, [invoices]);
+
+  const filteredInvoices = useMemo(() => {
+    return invoices.filter((inv) => {
+      // 1. Date filter
+      const dateVal = inv.issued_at || (inv as any).created_at || '';
+      if (!isWithinDateFilter(dateVal, dateFilter)) return false;
+
+      // 2. Search query filter
+      const rawQuery = searchQuery.toLowerCase().trim();
+      const keywords = rawQuery ? rawQuery.split(/\s+/).filter(Boolean) : [];
+      if (keywords.length === 0) return true;
+
+      const searchable = [
+        inv.invoice_number,
+        inv.invoice_type || '',
+        inv.status || '',
+        inv.issued_at || '',
+        inv.grand_total?.toString() || '',
+        inv.paid_amount?.toString() || '',
+        inv.outstanding_amount?.toString() || ''
+      ].join(' ').toLowerCase();
+
+      return keywords.every((kw) => searchable.includes(kw));
+    });
+  }, [invoices, dateFilter, searchQuery]);
+
+  const totalSales = filteredInvoices.reduce((a, c) => a + Number(c.grand_total || 0), 0);
+  const totalPaid = filteredInvoices.reduce((a, c) => a + Number(c.paid_amount || 0), 0);
+  const totalOutstanding = filteredInvoices.reduce((a, c) => a + Number(c.outstanding_amount || 0), 0);
+  const totalInvoicesCount = filteredInvoices.length;
 
   const exportStatementsCSV = () => {
     const header = ['Invoice Number', 'Type', 'Subtotal', 'Grand Total', 'Paid Amount', 'Outstanding', 'Status', 'Date Issued'].join(',');
@@ -68,18 +115,20 @@ export default function AdminStatementsPage() {
     const encoded = encodeURI(csvContent);
     const link = document.createElement('a');
     link.setAttribute('href', encoded);
-    link.setAttribute('download', `Chaiwale_Statements_${new Date().toISOString().split('T')[0]}.csv`);
+    link.setAttribute('download', `Chaiwale_Statements_${dateFilter}_${new Date().toISOString().split('T')[0]}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
   };
 
   return (
-    <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', flexWrap: 'wrap', gap: '16px' }}>
+    <div style={{ maxWidth: '1400px', margin: '0 auto', paddingBottom: '40px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '16px' }}>
         <div>
-          <h1 style={{ fontSize: '24px', fontWeight: 800, color: '#0F172A' }}>Statements & Financial Register</h1>
-          <p style={{ fontSize: '13px', color: '#64748B', marginTop: '2px' }}>
+          <h1 style={{ fontSize: '24px', fontWeight: 800, color: '#0F172A', margin: 0 }}>
+            Statements & Financial Register
+          </h1>
+          <p style={{ fontSize: '13px', color: '#64748B', marginTop: '3px' }}>
             Daily revenue, payment settlements, and accounting register (Zero-Tax Architecture)
           </p>
         </div>
@@ -110,7 +159,7 @@ export default function AdminStatementsPage() {
               border: '1px solid var(--cw-color-border)',
               borderRadius: 'var(--cw-radius-md)',
               fontSize: '13px',
-              fontWeight: 600,
+              fontWeight: 700,
               cursor: 'pointer'
             }}
           >
@@ -141,22 +190,84 @@ export default function AdminStatementsPage() {
         </div>
       )}
 
-      {/* Aggregate Cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px', marginBottom: '24px' }}>
+      {/* Date Filter Bar */}
+      <div
+        style={{
+          backgroundColor: '#FFFFFF',
+          padding: '12px 18px',
+          borderRadius: 'var(--cw-radius-md)',
+          border: '1px solid var(--cw-color-border)',
+          marginBottom: '18px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
+          flexWrap: 'wrap'
+        }}
+      >
+        <span style={{ fontSize: '12px', fontWeight: 800, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.04em', marginRight: '4px' }}>
+          Statement Period:
+        </span>
+        {[
+          { id: 'all', label: 'All Time', count: dateCounts.all },
+          { id: 'today', label: 'Today', count: dateCounts.today },
+          { id: 'yesterday', label: 'Yesterday', count: dateCounts.yesterday },
+          { id: 'week', label: 'Last 7 Days', count: dateCounts.week },
+          { id: 'month', label: 'This Month', count: dateCounts.month }
+        ].map(tab => {
+          const isSelected = dateFilter === tab.id;
+          return (
+            <button
+              key={tab.id}
+              onClick={() => setDateFilter(tab.id as any)}
+              style={{
+                padding: '6px 14px',
+                borderRadius: '6px',
+                fontSize: '12.5px',
+                fontWeight: 700,
+                cursor: 'pointer',
+                border: isSelected ? '1px solid #1E2328' : '1px solid #E2E8F0',
+                backgroundColor: isSelected ? '#1E2328' : '#F8FAFC',
+                color: isSelected ? '#FFFFFF' : '#475569',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                transition: 'all 0.15s ease'
+              }}
+            >
+              <span>{tab.label}</span>
+              <span
+                style={{
+                  backgroundColor: isSelected ? 'rgba(255,255,255,0.25)' : '#E2E8F0',
+                  color: isSelected ? '#FFFFFF' : '#475569',
+                  padding: '0 6px',
+                  borderRadius: '10px',
+                  fontSize: '10.5px',
+                  fontWeight: 800
+                }}
+              >
+                {tab.count}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Aggregate Financial Cards (Dynamically reflects dateFilter) */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px', marginBottom: '20px' }}>
         <div style={{ backgroundColor: '#FFFFFF', padding: '16px 20px', borderRadius: 'var(--cw-radius-md)', border: '1px solid var(--cw-color-border)' }}>
-          <div style={{ fontSize: '11px', color: '#64748B', fontWeight: 600, textTransform: 'uppercase' }}>Total Invoices</div>
+          <div style={{ fontSize: '11px', color: '#64748B', fontWeight: 700, textTransform: 'uppercase' }}>Filtered Invoices</div>
           <div style={{ fontSize: '24px', fontWeight: 800, color: '#0F172A', marginTop: '4px' }}>{totalInvoicesCount}</div>
         </div>
         <div style={{ backgroundColor: '#FFFFFF', padding: '16px 20px', borderRadius: 'var(--cw-radius-md)', border: '1px solid var(--cw-color-border)' }}>
-          <div style={{ fontSize: '11px', color: '#64748B', fontWeight: 600, textTransform: 'uppercase' }}>Gross Billed Sales</div>
+          <div style={{ fontSize: '11px', color: '#64748B', fontWeight: 700, textTransform: 'uppercase' }}>Period Gross Sales</div>
           <div style={{ fontSize: '24px', fontWeight: 800, color: '#16A34A', marginTop: '4px' }}>₹{totalSales.toFixed(2)}</div>
         </div>
         <div style={{ backgroundColor: '#FFFFFF', padding: '16px 20px', borderRadius: 'var(--cw-radius-md)', border: '1px solid var(--cw-color-border)' }}>
-          <div style={{ fontSize: '11px', color: '#64748B', fontWeight: 600, textTransform: 'uppercase' }}>Collections (Paid)</div>
+          <div style={{ fontSize: '11px', color: '#64748B', fontWeight: 700, textTransform: 'uppercase' }}>Collections (Paid)</div>
           <div style={{ fontSize: '24px', fontWeight: 800, color: '#0369A1', marginTop: '4px' }}>₹{totalPaid.toFixed(2)}</div>
         </div>
         <div style={{ backgroundColor: '#FFFFFF', padding: '16px 20px', borderRadius: 'var(--cw-radius-md)', border: '1px solid var(--cw-color-border)' }}>
-          <div style={{ fontSize: '11px', color: '#64748B', fontWeight: 600, textTransform: 'uppercase' }}>Outstanding Credit</div>
+          <div style={{ fontSize: '11px', color: '#64748B', fontWeight: 700, textTransform: 'uppercase' }}>Outstanding Credit</div>
           <div style={{ fontSize: '24px', fontWeight: 800, color: totalOutstanding > 0 ? '#DC2626' : '#64748B', marginTop: '4px' }}>
             ₹{totalOutstanding.toFixed(2)}
           </div>
@@ -171,7 +282,7 @@ export default function AdminStatementsPage() {
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           style={{
-            padding: '8px 14px',
+            padding: '9px 14px',
             border: '1px solid var(--cw-color-border)',
             borderRadius: 'var(--cw-radius-md)',
             fontSize: '13px',
@@ -179,7 +290,7 @@ export default function AdminStatementsPage() {
             maxWidth: '500px'
           }}
         />
-        <div style={{ fontSize: '12px', color: '#64748B', fontWeight: 600 }}>
+        <div style={{ fontSize: '12px', color: '#64748B', fontWeight: 700 }}>
           Showing {filteredInvoices.length} of {invoices.length} statements
         </div>
       </div>
@@ -200,50 +311,46 @@ export default function AdminStatementsPage() {
               </tr>
             </thead>
             <tbody>
-              {loading ? (
+              {filteredInvoices.length === 0 ? (
                 <tr>
-                  <td colSpan={7} style={{ padding: '32px', textAlign: 'center', color: '#64748B' }}>
-                    Loading statements register...
-                  </td>
-                </tr>
-              ) : filteredInvoices.length === 0 ? (
-                <tr>
-                  <td colSpan={7} style={{ padding: '32px', textAlign: 'center', color: '#64748B' }}>
-                    {searchQuery ? 'No statements match your search query.' : 'No statements found.'}
+                  <td colSpan={7} style={{ padding: '36px', textAlign: 'center', color: '#64748B' }}>
+                    No statement records match your active date filter or search query.
                   </td>
                 </tr>
               ) : (
                 filteredInvoices.map((inv) => (
                   <tr key={inv.id} style={{ borderBottom: '1px solid #F1F5F9' }}>
-                    <td style={{ padding: '12px 16px', fontWeight: 600, color: '#0F172A', fontFamily: 'monospace' }}>
+                    <td style={{ padding: '12px 16px', fontWeight: 800, fontFamily: 'monospace', color: '#1D4ED8' }}>
                       {inv.invoice_number}
                     </td>
                     <td style={{ padding: '12px 16px' }}>
-                      <span style={{ fontSize: '11px', padding: '2px 8px', borderRadius: '4px', backgroundColor: '#F1F5F9', color: '#475569', fontWeight: 600 }}>
+                      <span style={{ fontSize: '11px', fontWeight: 700, padding: '2px 8px', borderRadius: '4px', backgroundColor: '#F1F5F9', color: '#475569' }}>
                         {inv.invoice_type}
                       </span>
                     </td>
                     <td style={{ padding: '12px 16px', color: '#64748B' }}>
-                      {inv.issued_at ? new Date(inv.issued_at).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', year: 'numeric' }) : '-'}
+                      {inv.issued_at ? new Date(inv.issued_at).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' }) : 'N/A'}
                     </td>
-                    <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 700, color: '#0F172A' }}>
-                      ₹{Number(inv.grand_total || 0).toFixed(2)}
+                    <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 800 }}>
+                      ₹{Number(inv.grand_total).toFixed(2)}
                     </td>
-                    <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 600, color: '#16A34A' }}>
+                    <td style={{ padding: '12px 16px', textAlign: 'right', color: '#16A34A', fontWeight: 700 }}>
                       ₹{Number(inv.paid_amount || 0).toFixed(2)}
                     </td>
-                    <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 600, color: Number(inv.outstanding_amount || 0) > 0 ? '#DC2626' : '#64748B' }}>
+                    <td style={{ padding: '12px 16px', textAlign: 'right', color: Number(inv.outstanding_amount || 0) > 0 ? '#DC2626' : '#64748B', fontWeight: 700 }}>
                       ₹{Number(inv.outstanding_amount || 0).toFixed(2)}
                     </td>
                     <td style={{ padding: '12px 16px', textAlign: 'center' }}>
-                      <span style={{
-                        fontSize: '11px',
-                        padding: '3px 8px',
-                        borderRadius: '9999px',
-                        fontWeight: 700,
-                        backgroundColor: inv.status === 'PAID' ? '#DCFCE7' : Number(inv.outstanding_amount || 0) > 0 ? '#FEE2E2' : '#FEF3C7',
-                        color: inv.status === 'PAID' ? '#166534' : Number(inv.outstanding_amount || 0) > 0 ? '#991B1B' : '#92400E'
-                      }}>
+                      <span
+                        style={{
+                          fontSize: '11px',
+                          fontWeight: 700,
+                          padding: '3px 8px',
+                          borderRadius: '12px',
+                          backgroundColor: inv.status === 'PAID' ? '#DCFCE7' : inv.status === 'PARTIALLY_PAID' ? '#FEF3C7' : '#FEE2E2',
+                          color: inv.status === 'PAID' ? '#16A34A' : inv.status === 'PARTIALLY_PAID' ? '#D97706' : '#DC2626'
+                        }}
+                      >
                         {inv.status}
                       </span>
                     </td>
@@ -253,13 +360,6 @@ export default function AdminStatementsPage() {
             </tbody>
           </table>
         </div>
-      </div>
-
-      <div style={{ backgroundColor: '#FFFFFF', padding: '20px 24px', borderRadius: 'var(--cw-radius-md)', border: '1px solid var(--cw-color-border)' }}>
-        <h3 style={{ fontSize: '15px', fontWeight: 700, marginBottom: '6px' }}>Zero-Tax & Operations Accounting Guide</h3>
-        <p style={{ fontSize: '13px', color: '#64748B', lineHeight: 1.6, margin: 0 }}>
-          Chaiwale operations run on pure itemized pricing with zero tax calculation (Subtotal equals Grand Total). All orders punched at the counter POS or placed online are recorded in real-time with verified audit trails, instant payment recording, and double-entry corporate customer ledgers.
-        </p>
       </div>
     </div>
   );

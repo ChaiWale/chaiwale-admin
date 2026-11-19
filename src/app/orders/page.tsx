@@ -18,15 +18,29 @@ export default function AdminOrdersPage() {
   const [loading, setLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Filters: Status + Date + Search
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
+  const [dateFilter, setDateFilter] = useState<'all' | 'today' | 'yesterday' | 'week' | 'month'>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
+
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [actionSuccess, setActionSuccess] = useState<string | null>(null);
-  const [receiptModalOpen, setReceiptModalOpen] = useState(false);
-  const [receiptModalData, setReceiptModalData] = useState<ThermalReceiptData | null>(null);
-  const [viewMode, setViewMode] = useState<'cards' | 'table'>('cards');
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [lastRefreshed, setLastRefreshed] = useState<Date>(new Date());
+
+  // In-App Pop-up Modal States (No browser alert / confirm)
+  const [rejectModalOrder, setRejectModalOrder] = useState<AdminOrderDto | null>(null);
+  const [rejectReason, setRejectReason] = useState<string>('Kitchen busy / Peak rush');
+
+  const [deleteModalOrder, setDeleteModalOrder] = useState<AdminOrderDto | null>(null);
+
+  const [verifyUpiOrder, setVerifyUpiOrder] = useState<AdminOrderDto | null>(null);
+  const [verifyUpiUtr, setVerifyUpiUtr] = useState<string>('');
+
+  // Thermal Receipt Modal
+  const [receiptModalOpen, setReceiptModalOpen] = useState(false);
+  const [receiptModalData, setReceiptModalData] = useState<ThermalReceiptData | null>(null);
 
   const previousPendingCount = useRef<number>(0);
 
@@ -37,7 +51,7 @@ export default function AdminOrdersPage() {
     }
     setError(null);
     try {
-      const data = await fetchRecentOrders(60);
+      const data = await fetchRecentOrders(75);
       setOrders(data);
       setLastRefreshed(new Date());
 
@@ -50,8 +64,8 @@ export default function AdminOrdersPage() {
           const gain = ctx.createGain();
           osc.connect(gain);
           gain.connect(ctx.destination);
-          osc.frequency.setValueAtTime(587.33, ctx.currentTime); // D5
-          osc.frequency.setValueAtTime(880, ctx.currentTime + 0.15); // A5
+          osc.frequency.setValueAtTime(587.33, ctx.currentTime);
+          osc.frequency.setValueAtTime(880, ctx.currentTime + 0.15);
           gain.gain.setValueAtTime(0.2, ctx.currentTime);
           gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.4);
           osc.start();
@@ -97,42 +111,67 @@ export default function AdminOrdersPage() {
     }
   };
 
-  const handleVerifyPayment = async (order: AdminOrderDto) => {
-    const utr = prompt(
-      `Verify UPI Payment for #${order.order_number}?\nEnter/Confirm UTR reference:`,
-      order.transaction_ref || ''
-    );
-    if (utr === null) return;
-
-    setUpdatingId(order.id);
+  // Reject Confirmation Handler (In-App Modal)
+  const handleConfirmReject = async () => {
+    if (!rejectModalOrder) return;
+    const orderId = rejectModalOrder.id;
+    const orderNum = rejectModalOrder.order_number;
+    setUpdatingId(orderId);
     try {
-      await verifyOrderPayment(order.id, utr.trim() || undefined);
+      await updateOrderStatus(orderId, 'CANCELLED');
       setOrders(prev =>
-        prev.map(o =>
-          o.id === order.id
-            ? { ...o, payment_status: 'PAID', transaction_ref: utr.trim() || o.transaction_ref }
-            : o
-        )
+        prev.map(o => (o.id === orderId ? { ...o, status: 'CANCELLED' } : o))
       );
-      setActionSuccess(`UPI Payment verified for #${order.order_number}`);
-      setTimeout(() => setActionSuccess(null), 3000);
+      setActionSuccess(`Order #${orderNum} rejected (${rejectReason})`);
+      setRejectModalOrder(null);
+      setTimeout(() => setActionSuccess(null), 3500);
     } catch (err: any) {
-      alert(`Payment verification failed: ${err.message}`);
+      alert(`Reject failed: ${err.message}`);
     } finally {
       setUpdatingId(null);
     }
   };
 
-  const handleDeleteOrder = async (order: AdminOrderDto) => {
-    if (!confirm(`Permanently delete order #${order.order_number}?\n\nThis cannot be undone.`)) return;
-    setUpdatingId(order.id);
+  // Delete Confirmation Handler (In-App Modal)
+  const handleConfirmDelete = async () => {
+    if (!deleteModalOrder) return;
+    const orderId = deleteModalOrder.id;
+    const orderNum = deleteModalOrder.order_number;
+    setUpdatingId(orderId);
     try {
-      await deleteOrder(order.id);
-      setOrders(prev => prev.filter(o => o.id !== order.id));
-      setActionSuccess(`Order #${order.order_number} permanently deleted`);
+      await deleteOrder(orderId);
+      setOrders(prev => prev.filter(o => o.id !== orderId));
+      setActionSuccess(`Order #${orderNum} permanently deleted`);
+      setDeleteModalOrder(null);
       setTimeout(() => setActionSuccess(null), 3500);
     } catch (err: any) {
       alert(`Delete failed: ${err.message}`);
+    } finally {
+      setUpdatingId(null);
+    }
+  };
+
+  // UPI Verification Handler (In-App Modal)
+  const handleConfirmVerifyPayment = async () => {
+    if (!verifyUpiOrder) return;
+    const orderId = verifyUpiOrder.id;
+    const orderNum = verifyUpiOrder.order_number;
+    const utr = verifyUpiUtr.trim();
+    setUpdatingId(orderId);
+    try {
+      await verifyOrderPayment(orderId, utr || undefined);
+      setOrders(prev =>
+        prev.map(o =>
+          o.id === orderId
+            ? { ...o, payment_status: 'PAID', transaction_ref: utr || o.transaction_ref }
+            : o
+        )
+      );
+      setActionSuccess(`UPI Payment verified for #${orderNum}`);
+      setVerifyUpiOrder(null);
+      setTimeout(() => setActionSuccess(null), 3000);
+    } catch (err: any) {
+      alert(`Payment verification failed: ${err.message}`);
     } finally {
       setUpdatingId(null);
     }
@@ -173,8 +212,7 @@ export default function AdminOrdersPage() {
           color: '#B45309',
           bg: '#FEF3C7',
           border: '#FDE68A',
-          label: '🟡 Awaiting Confirmation',
-          pulsing: true
+          label: '🟡 Awaiting Confirmation'
         };
       case 'CONFIRMED':
         return {
@@ -229,22 +267,66 @@ export default function AdminOrdersPage() {
     }
   };
 
-  // Filter Counts
-  const counts = useMemo(() => {
+  // Date Filter Evaluator
+  const isWithinDateFilter = (dateStr: string, filter: 'all' | 'today' | 'yesterday' | 'week' | 'month') => {
+    if (filter === 'all') return true;
+    try {
+      const d = new Date(dateStr);
+      const now = new Date();
+      const pad = (n: number) => String(n).padStart(2, '0');
+      const dateKey = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+      const todayKey = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+
+      const y = new Date(now);
+      y.setDate(y.getDate() - 1);
+      const yesterdayKey = `${y.getFullYear()}-${pad(y.getMonth() + 1)}-${pad(y.getDate())}`;
+
+      if (filter === 'today') return dateKey === todayKey;
+      if (filter === 'yesterday') return dateKey === yesterdayKey;
+      if (filter === 'week') {
+        const diffMs = now.getTime() - d.getTime();
+        const diffDays = diffMs / (1000 * 60 * 60 * 24);
+        return diffDays >= 0 && diffDays <= 7;
+      }
+      if (filter === 'month') {
+        return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+      }
+    } catch {}
+    return true;
+  };
+
+  // Date Counts
+  const dateCounts = useMemo(() => {
     return {
       all: orders.length,
-      pending: orders.filter(o => o.status === 'PENDING' || o.status === 'NEW').length,
-      kitchen: orders.filter(o => o.status === 'CONFIRMED' || o.status === 'PREPARING').length,
-      ready: orders.filter(o => o.status === 'READY').length,
-      out: orders.filter(o => o.status === 'OUT_FOR_DELIVERY').length,
-      delivered: orders.filter(o => o.status === 'DELIVERED' || o.status === 'COMPLETED').length,
-      cancelled: orders.filter(o => o.status === 'CANCELLED').length
+      today: orders.filter(o => isWithinDateFilter(o.created_at, 'today')).length,
+      yesterday: orders.filter(o => isWithinDateFilter(o.created_at, 'yesterday')).length,
+      week: orders.filter(o => isWithinDateFilter(o.created_at, 'week')).length,
+      month: orders.filter(o => isWithinDateFilter(o.created_at, 'month')).length
     };
   }, [orders]);
 
-  // Filtered Orders
+  // Orders filtered by Date first
+  const dateFilteredOrders = useMemo(() => {
+    return orders.filter(o => isWithinDateFilter(o.created_at, dateFilter));
+  }, [orders, dateFilter]);
+
+  // Status Counts calculated on active date scope
+  const counts = useMemo(() => {
+    return {
+      all: dateFilteredOrders.length,
+      pending: dateFilteredOrders.filter(o => o.status === 'PENDING' || o.status === 'NEW').length,
+      kitchen: dateFilteredOrders.filter(o => o.status === 'CONFIRMED' || o.status === 'PREPARING').length,
+      ready: dateFilteredOrders.filter(o => o.status === 'READY').length,
+      out: dateFilteredOrders.filter(o => o.status === 'OUT_FOR_DELIVERY').length,
+      delivered: dateFilteredOrders.filter(o => o.status === 'DELIVERED' || o.status === 'COMPLETED').length,
+      cancelled: dateFilteredOrders.filter(o => o.status === 'CANCELLED').length
+    };
+  }, [dateFilteredOrders]);
+
+  // Final Filtered Orders
   const filteredOrders = useMemo(() => {
-    return orders.filter(order => {
+    return dateFilteredOrders.filter(order => {
       const s = (order.status || '').toUpperCase();
       let matchesFilter = true;
       if (statusFilter === 'PENDING') {
@@ -284,7 +366,7 @@ export default function AdminOrdersPage() {
 
       return keywords.every(kw => searchable.includes(kw));
     });
-  }, [orders, statusFilter, searchQuery]);
+  }, [dateFilteredOrders, statusFilter, searchQuery]);
 
   const formatRelativeTime = (dateStr: string) => {
     try {
@@ -321,7 +403,7 @@ export default function AdminOrdersPage() {
                 style={{
                   backgroundColor: '#D97706',
                   color: '#FFFFFF',
-                  padding: '3px 10px',
+                  padding: '4px 12px',
                   borderRadius: '16px',
                   fontSize: '12px',
                   fontWeight: 800,
@@ -335,7 +417,7 @@ export default function AdminOrdersPage() {
             )}
           </div>
           <p style={{ fontSize: '13px', color: '#64748B', marginTop: '3px' }}>
-            Live kitchen display and dispatch control synchronized across store, POS, and customer track screen.
+            Real-time kitchen stream and delivery pipeline with instant status actions.
           </p>
         </div>
 
@@ -360,40 +442,8 @@ export default function AdminOrdersPage() {
             title={autoRefresh ? 'Auto-refreshing every 20s. Click to pause.' : 'Auto-refresh paused. Click to enable.'}
           >
             <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: autoRefresh ? '#10B981' : '#94A3B8' }} />
-            {autoRefresh ? 'Live Polling: ON' : 'Live Polling: PAUSED'}
+            {autoRefresh ? 'Live Stream: ON' : 'Live Stream: PAUSED'}
           </button>
-
-          {/* View Mode Toggle */}
-          <div style={{ display: 'flex', border: '1px solid var(--cw-color-border)', borderRadius: 'var(--cw-radius-md)', overflow: 'hidden' }}>
-            <button
-              onClick={() => setViewMode('cards')}
-              style={{
-                padding: '7px 12px',
-                backgroundColor: viewMode === 'cards' ? '#6F432A' : '#FFFFFF',
-                color: viewMode === 'cards' ? '#FFFFFF' : '#64748B',
-                border: 'none',
-                fontSize: '12px',
-                fontWeight: 700,
-                cursor: 'pointer'
-              }}
-            >
-              🗂️ Cards
-            </button>
-            <button
-              onClick={() => setViewMode('table')}
-              style={{
-                padding: '7px 12px',
-                backgroundColor: viewMode === 'table' ? '#6F432A' : '#FFFFFF',
-                color: viewMode === 'table' ? '#FFFFFF' : '#64748B',
-                border: 'none',
-                fontSize: '12px',
-                fontWeight: 700,
-                cursor: 'pointer'
-              }}
-            >
-              📋 Table
-            </button>
-          </div>
 
           {/* Manual Refresh */}
           <button
@@ -440,20 +490,70 @@ export default function AdminOrdersPage() {
       <div
         style={{
           backgroundColor: '#FFFFFF',
-          padding: '14px 16px',
+          padding: '16px 18px',
           borderRadius: 'var(--cw-radius-lg)',
           border: '1px solid var(--cw-color-border)',
-          marginBottom: '18px',
+          marginBottom: '20px',
           boxShadow: 'var(--cw-shadow-sm)',
           display: 'flex',
           flexDirection: 'column',
-          gap: '12px'
+          gap: '14px'
         }}
       >
-        {/* Status Pipeline Tabs */}
-        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
+        {/* ROW 1: Date Filter Tabs (Today, Yesterday, 7 Days, Month, All Time) */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+          <span style={{ fontSize: '12px', fontWeight: 800, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.04em', marginRight: '4px' }}>
+            Date Range:
+          </span>
           {[
-            { id: 'ALL', label: 'All Orders', count: counts.all },
+            { id: 'all', label: 'All Orders', count: dateCounts.all },
+            { id: 'today', label: 'Today', count: dateCounts.today },
+            { id: 'yesterday', label: 'Yesterday', count: dateCounts.yesterday },
+            { id: 'week', label: 'Last 7 Days', count: dateCounts.week },
+            { id: 'month', label: 'This Month', count: dateCounts.month }
+          ].map(tab => {
+            const isSelected = dateFilter === tab.id;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => setDateFilter(tab.id as any)}
+                style={{
+                  padding: '6px 12px',
+                  borderRadius: '6px',
+                  fontSize: '12px',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  border: isSelected ? '1px solid #1E2328' : '1px solid #E2E8F0',
+                  backgroundColor: isSelected ? '#1E2328' : '#F8FAFC',
+                  color: isSelected ? '#FFFFFF' : '#475569',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  transition: 'all 0.15s ease'
+                }}
+              >
+                <span>{tab.label}</span>
+                <span
+                  style={{
+                    backgroundColor: isSelected ? 'rgba(255,255,255,0.25)' : '#E2E8F0',
+                    color: isSelected ? '#FFFFFF' : '#475569',
+                    padding: '0 6px',
+                    borderRadius: '10px',
+                    fontSize: '10.5px',
+                    fontWeight: 800
+                  }}
+                >
+                  {tab.count}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* ROW 2: Status Pipeline Tabs */}
+        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center', borderTop: '1px solid #F1F5F9', paddingTop: '12px' }}>
+          {[
+            { id: 'ALL', label: 'All Statuses', count: counts.all },
             { id: 'PENDING', label: '🟡 Pending Approval', count: counts.pending, urgent: counts.pending > 0 },
             { id: 'KITCHEN', label: '🍳 In Kitchen', count: counts.kitchen },
             { id: 'READY', label: '🥡 Food Ready', count: counts.ready },
@@ -505,11 +605,11 @@ export default function AdminOrdersPage() {
           })}
         </div>
 
-        {/* Search input */}
+        {/* ROW 3: Search input */}
         <div style={{ position: 'relative' }}>
           <input
             type="text"
-            placeholder="🔍 Search orders by #, customer name, phone, address, dish items, or chef instructions..."
+            placeholder="🔍 Search orders by #, customer name, phone, address, dish items, or kitchen notes..."
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
             style={{
@@ -543,7 +643,7 @@ export default function AdminOrdersPage() {
         </div>
       </div>
 
-      {/* Orders List / Grid */}
+      {/* Orders List / Grid (CARDS ONLY) */}
       {loading && orders.length === 0 ? (
         <div style={{ padding: '60px 20px', display: 'flex', justifyContent: 'center' }}>
           <ChaiLoader label="Loading Live Orders..." sublabel="Connecting to real-time order stream..." />
@@ -562,13 +662,13 @@ export default function AdminOrdersPage() {
           <span style={{ fontSize: '40px', display: 'block', marginBottom: '10px' }}>📦</span>
           <p style={{ fontSize: '16px', fontWeight: 700, color: '#1E2328' }}>No Orders Found</p>
           <p style={{ fontSize: '13px', marginTop: '4px' }}>
-            {searchQuery || statusFilter !== 'ALL'
-              ? 'No orders match your active filter or search query.'
+            {searchQuery || statusFilter !== 'ALL' || dateFilter !== 'all'
+              ? 'No orders match your active date filter, status, or search query.'
               : 'Orders placed from the website storefront or POS counter will appear here in real-time.'}
           </p>
-          {(searchQuery || statusFilter !== 'ALL') && (
+          {(searchQuery || statusFilter !== 'ALL' || dateFilter !== 'all') && (
             <button
-              onClick={() => { setStatusFilter('ALL'); setSearchQuery(''); }}
+              onClick={() => { setStatusFilter('ALL'); setDateFilter('all'); setSearchQuery(''); }}
               style={{
                 marginTop: '14px',
                 padding: '6px 16px',
@@ -580,12 +680,11 @@ export default function AdminOrdersPage() {
                 cursor: 'pointer'
               }}
             >
-              Reset Filters
+              Reset All Filters
             </button>
           )}
         </div>
-      ) : viewMode === 'cards' ? (
-        /* ================= CARDS VIEW (DEFAULT & RESPONSIVE) ================= */
+      ) : (
         <div className="orders-grid-container" style={{ display: 'grid' }}>
           {filteredOrders.map(order => {
             const badge = getStatusBadge(order.status);
@@ -602,9 +701,9 @@ export default function AdminOrdersPage() {
                 key={order.id}
                 style={{
                   backgroundColor: '#FFFFFF',
-                  borderRadius: 'var(--cw-radius-lg)',
-                  border: isPending ? '2px solid #F59E0B' : '1px solid var(--cw-color-border)',
-                  boxShadow: isPending ? '0 4px 14px rgba(245, 158, 11, 0.15)' : 'var(--cw-shadow-sm)',
+                  borderRadius: '12px',
+                  border: isPending ? '2px solid #F59E0B' : '1px solid #E2E8F0',
+                  boxShadow: isPending ? '0 4px 16px rgba(245, 158, 11, 0.16)' : '0 2px 8px rgba(0,0,0,0.04)',
                   display: 'flex',
                   flexDirection: 'column',
                   overflow: 'hidden',
@@ -618,13 +717,14 @@ export default function AdminOrdersPage() {
                     style={{
                       backgroundColor: '#FEF3C7',
                       color: '#92400E',
-                      fontSize: '11px',
+                      fontSize: '11.5px',
                       fontWeight: 800,
-                      padding: '4px 14px',
+                      padding: '5px 16px',
                       borderBottom: '1px solid #FDE68A',
                       display: 'flex',
                       alignItems: 'center',
-                      justifyContent: 'space-between'
+                      justifyContent: 'space-between',
+                      letterSpacing: '0.02em'
                     }}
                   >
                     <span>⚠️ NEW INCOMING ORDER — ACTION REQUIRED</span>
@@ -653,7 +753,7 @@ export default function AdminOrdersPage() {
                           fontWeight: 800,
                           color: '#1D4ED8',
                           fontFamily: 'monospace',
-                          fontSize: '14px',
+                          fontSize: '14.5px',
                           textDecoration: 'none',
                           display: 'inline-flex',
                           alignItems: 'center',
@@ -672,8 +772,8 @@ export default function AdminOrdersPage() {
                       <span
                         style={{
                           fontSize: '11px',
-                          fontWeight: 700,
-                          padding: '2px 8px',
+                          fontWeight: 800,
+                          padding: '3px 8px',
                           borderRadius: '6px',
                           backgroundColor:
                             order.order_type === 'DIRECT_DELIVERY' ? '#EFF6FF' :
@@ -684,7 +784,8 @@ export default function AdminOrdersPage() {
                           border: `1px solid ${
                             order.order_type === 'DIRECT_DELIVERY' ? '#BFDBFE' :
                             order.order_type === 'TAKEAWAY' ? '#FDE68A' : '#BBF7D0'
-                          }`
+                          }`,
+                          letterSpacing: '0.03em'
                         }}
                       >
                         {order.order_type === 'DIRECT_DELIVERY' ? '🛵 DELIVERY' :
@@ -693,7 +794,7 @@ export default function AdminOrdersPage() {
                       </span>
                     </div>
 
-                    <div style={{ fontSize: '11.5px', color: '#94A3B8', marginTop: '4px' }}>
+                    <div style={{ fontSize: '11.5px', color: '#64748B', marginTop: '4px', fontWeight: 500 }}>
                       {new Date(order.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} •{' '}
                       {new Date(order.created_at).toLocaleDateString([], { month: 'short', day: 'numeric' })}{' '}
                       {!isPending && `(${formatRelativeTime(order.created_at)})`}
@@ -709,7 +810,7 @@ export default function AdminOrdersPage() {
                       padding: '4px 10px',
                       borderRadius: '14px',
                       fontSize: '11.5px',
-                      fontWeight: 700,
+                      fontWeight: 800,
                       backgroundColor: badge.bg,
                       color: badge.color,
                       border: `1px solid ${badge.border}`
@@ -732,7 +833,7 @@ export default function AdminOrdersPage() {
                 >
                   {/* Customer Name */}
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '6px' }}>
-                    <div style={{ fontWeight: 800, color: '#0F172A', fontSize: '14.5px' }}>
+                    <div style={{ fontWeight: 800, color: '#0F172A', fontSize: '15px' }}>
                       👤 {order.customer_name || 'Walk-in Guest'}
                     </div>
 
@@ -795,7 +896,7 @@ export default function AdminOrdersPage() {
 
                   {/* Delivery Address */}
                   {order.delivery_address ? (
-                    <div style={{ marginTop: '6px', color: '#334155', fontSize: '12.5px', lineHeight: 1.4 }}>
+                    <div style={{ marginTop: '6px', color: '#334155', fontSize: '12.5px', lineHeight: 1.45 }}>
                       📍 <strong>Address:</strong> {order.delivery_address}{' '}
                       {mapsUrl && (
                         <a
@@ -829,12 +930,13 @@ export default function AdminOrdersPage() {
                     <div
                       style={{
                         marginTop: '8px',
-                        padding: '6px 10px',
+                        padding: '7px 10px',
                         backgroundColor: '#FFFBEB',
                         border: '1px solid #FCD34D',
                         borderRadius: '6px',
                         fontSize: '12px',
-                        color: '#92400E'
+                        color: '#92400E',
+                        lineHeight: 1.4
                       }}
                     >
                       📝 <strong>Kitchen Note:</strong> {order.special_instructions}
@@ -844,11 +946,11 @@ export default function AdminOrdersPage() {
 
                 {/* Items Summary Snapshot */}
                 <div style={{ padding: '0 16px 10px', flex: 1 }}>
-                  <div style={{ fontSize: '11px', fontWeight: 700, color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '6px' }}>
+                  <div style={{ fontSize: '11px', fontWeight: 800, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '6px' }}>
                     Items Snapshot ({order.items?.length || 0})
                   </div>
 
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
                     {order.items && order.items.length > 0 ? (
                       order.items.map((item, idx) => (
                         <div
@@ -857,16 +959,16 @@ export default function AdminOrdersPage() {
                             display: 'flex',
                             justifyContent: 'space-between',
                             alignItems: 'center',
-                            fontSize: '12.5px',
+                            fontSize: '13px',
                             padding: '3px 0',
                             borderBottom: idx < order.items!.length - 1 ? '1px dashed #F1F5F9' : 'none'
                           }}
                         >
                           <span style={{ color: '#1E2328' }}>
-                            <strong style={{ color: '#6F432A', marginRight: '6px' }}>{item.quantity}x</strong>
+                            <strong style={{ color: '#6F432A', marginRight: '6px', fontSize: '13.5px' }}>{item.quantity}x</strong>
                             {item.item_name}
                           </span>
-                          <span style={{ fontWeight: 600, color: '#475569', fontSize: '12px' }}>
+                          <span style={{ fontWeight: 700, color: '#334155', fontSize: '12.5px' }}>
                             ₹{Number(item.line_total || item.unit_price * item.quantity).toFixed(2)}
                           </span>
                         </div>
@@ -883,16 +985,16 @@ export default function AdminOrdersPage() {
                       justifyContent: 'space-between',
                       alignItems: 'center',
                       backgroundColor: '#F1F5F9',
-                      padding: '8px 12px',
+                      padding: '9px 12px',
                       borderRadius: '8px',
                       marginTop: '10px'
                     }}
                   >
                     <div>
-                      <div style={{ fontSize: '15px', fontWeight: 800, color: '#0F172A' }}>
+                      <div style={{ fontSize: '16px', fontWeight: 800, color: '#0F172A' }}>
                         ₹{Number(order.grand_total).toFixed(2)}
                       </div>
-                      <div style={{ fontSize: '10.5px', color: '#64748B' }}>
+                      <div style={{ fontSize: '11px', color: '#64748B' }}>
                         (Tax: ₹{Number(order.tax_amount || 0).toFixed(2)})
                       </div>
                     </div>
@@ -902,8 +1004,8 @@ export default function AdminOrdersPage() {
                       <span
                         style={{
                           fontSize: '11px',
-                          fontWeight: 700,
-                          padding: '2px 7px',
+                          fontWeight: 800,
+                          padding: '3px 8px',
                           borderRadius: '4px',
                           backgroundColor: order.payment_mode === 'UPI' ? '#E0F2FE' : '#DCFCE7',
                           color: order.payment_mode === 'UPI' ? '#0284C7' : '#166534'
@@ -916,8 +1018,8 @@ export default function AdminOrdersPage() {
                       <span
                         style={{
                           fontSize: '11px',
-                          fontWeight: 700,
-                          padding: '2px 7px',
+                          fontWeight: 800,
+                          padding: '3px 8px',
                           borderRadius: '4px',
                           backgroundColor:
                             order.payment_status === 'PAID' || order.payment_status === 'COMPLETED'
@@ -932,22 +1034,25 @@ export default function AdminOrdersPage() {
                         {order.payment_status || 'PENDING'}
                       </span>
 
-                      {/* Verify UPI Payment Button */}
+                      {/* Verify UPI Payment Button -> Opens In-App Modal */}
                       {order.payment_mode === 'UPI' && order.payment_status !== 'PAID' && (
                         <button
-                          onClick={() => handleVerifyPayment(order)}
+                          onClick={() => {
+                            setVerifyUpiOrder(order);
+                            setVerifyUpiUtr(order.transaction_ref || '');
+                          }}
                           disabled={isUpdating}
                           style={{
-                            padding: '3px 8px',
+                            padding: '4px 8px',
                             backgroundColor: '#16A34A',
                             color: '#FFFFFF',
                             border: 'none',
                             borderRadius: '4px',
                             fontSize: '11px',
-                            fontWeight: 700,
+                            fontWeight: 800,
                             cursor: isUpdating ? 'not-allowed' : 'pointer'
                           }}
-                          title="Verify UTR and mark PAID"
+                          title="Verify UTR reference and mark PAID"
                         >
                           ✓ Verify UPI
                         </button>
@@ -965,19 +1070,19 @@ export default function AdminOrdersPage() {
                 {/* Primary 1-Tap Action Pipeline Button */}
                 <div style={{ padding: '10px 16px', borderTop: '1px solid #F1F5F9', backgroundColor: '#FAFAFA' }}>
                   {isPending ? (
-                    /* PENDING / NEW: Big Accept & Confirm + Reject */
+                    /* PENDING / NEW: Big Accept & Confirm + Reject (Opens Modal) */
                     <div style={{ display: 'flex', gap: '8px' }}>
                       <button
                         onClick={() => handleStatusChange(order.id, 'CONFIRMED')}
                         disabled={isUpdating}
                         style={{
                           flex: 2,
-                          padding: '10px 14px',
+                          padding: '11px 14px',
                           backgroundColor: '#16A34A',
                           color: '#FFFFFF',
                           border: 'none',
                           borderRadius: '8px',
-                          fontSize: '13px',
+                          fontSize: '13.5px',
                           fontWeight: 800,
                           cursor: isUpdating ? 'not-allowed' : 'pointer',
                           display: 'flex',
@@ -990,26 +1095,30 @@ export default function AdminOrdersPage() {
                         {isUpdating ? 'Updating...' : '✅ Accept & Confirm Order'}
                       </button>
 
+                      {/* Reject Button -> Opens in-app modal instead of window.confirm */}
                       <button
                         onClick={() => {
-                          if (confirm(`Reject order #${order.order_number}? This will cancel the order.`)) {
-                            handleStatusChange(order.id, 'CANCELLED');
-                          }
+                          setRejectModalOrder(order);
+                          setRejectReason('Kitchen busy / Peak rush');
                         }}
                         disabled={isUpdating}
                         style={{
                           flex: 1,
-                          padding: '10px 12px',
+                          padding: '11px 12px',
                           backgroundColor: '#FFFFFF',
                           color: '#DC2626',
-                          border: '1px solid #FCA5A5',
+                          border: '1.5px solid #FCA5A5',
                           borderRadius: '8px',
-                          fontSize: '12px',
-                          fontWeight: 700,
-                          cursor: isUpdating ? 'not-allowed' : 'pointer'
+                          fontSize: '12.5px',
+                          fontWeight: 800,
+                          cursor: isUpdating ? 'not-allowed' : 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '4px'
                         }}
                       >
-                        ❌ Reject
+                        ✕ Reject
                       </button>
                     </div>
                   ) : order.status === 'CONFIRMED' ? (
@@ -1020,12 +1129,12 @@ export default function AdminOrdersPage() {
                         disabled={isUpdating}
                         style={{
                           flex: 1,
-                          padding: '10px 14px',
+                          padding: '11px 14px',
                           backgroundColor: '#0284C7',
                           color: '#FFFFFF',
                           border: 'none',
                           borderRadius: '8px',
-                          fontSize: '13px',
+                          fontSize: '13.5px',
                           fontWeight: 800,
                           cursor: isUpdating ? 'not-allowed' : 'pointer',
                           display: 'flex',
@@ -1038,13 +1147,12 @@ export default function AdminOrdersPage() {
                       </button>
                       <button
                         onClick={() => {
-                          if (confirm(`Cancel order #${order.order_number}?`)) {
-                            handleStatusChange(order.id, 'CANCELLED');
-                          }
+                          setRejectModalOrder(order);
+                          setRejectReason('Order cancelled by store');
                         }}
                         disabled={isUpdating}
                         style={{
-                          padding: '10px 12px',
+                          padding: '11px 12px',
                           backgroundColor: '#FFFFFF',
                           color: '#64748B',
                           border: '1px solid #CBD5E1',
@@ -1064,12 +1172,12 @@ export default function AdminOrdersPage() {
                       disabled={isUpdating}
                       style={{
                         width: '100%',
-                        padding: '10px 14px',
+                        padding: '11px 14px',
                         backgroundColor: '#0D9488',
                         color: '#FFFFFF',
                         border: 'none',
                         borderRadius: '8px',
-                        fontSize: '13px',
+                        fontSize: '13.5px',
                         fontWeight: 800,
                         cursor: isUpdating ? 'not-allowed' : 'pointer',
                         display: 'flex',
@@ -1089,12 +1197,12 @@ export default function AdminOrdersPage() {
                           disabled={isUpdating}
                           style={{
                             flex: 1,
-                            padding: '10px 14px',
+                            padding: '11px 14px',
                             backgroundColor: '#7C3AED',
                             color: '#FFFFFF',
                             border: 'none',
                             borderRadius: '8px',
-                            fontSize: '13px',
+                            fontSize: '13.5px',
                             fontWeight: 800,
                             cursor: isUpdating ? 'not-allowed' : 'pointer',
                             display: 'flex',
@@ -1111,12 +1219,12 @@ export default function AdminOrdersPage() {
                           disabled={isUpdating}
                           style={{
                             flex: 1,
-                            padding: '10px 14px',
+                            padding: '11px 14px',
                             backgroundColor: '#16A34A',
                             color: '#FFFFFF',
                             border: 'none',
                             borderRadius: '8px',
-                            fontSize: '13px',
+                            fontSize: '13.5px',
                             fontWeight: 800,
                             cursor: isUpdating ? 'not-allowed' : 'pointer',
                             display: 'flex',
@@ -1132,7 +1240,7 @@ export default function AdminOrdersPage() {
                         onClick={() => handleStatusChange(order.id, 'DELIVERED')}
                         disabled={isUpdating}
                         style={{
-                          padding: '10px 12px',
+                          padding: '11px 12px',
                           backgroundColor: '#16A34A',
                           color: '#FFFFFF',
                           border: 'none',
@@ -1153,12 +1261,12 @@ export default function AdminOrdersPage() {
                       disabled={isUpdating}
                       style={{
                         width: '100%',
-                        padding: '10px 14px',
+                        padding: '11px 14px',
                         backgroundColor: '#16A34A',
                         color: '#FFFFFF',
                         border: 'none',
                         borderRadius: '8px',
-                        fontSize: '13px',
+                        fontSize: '13.5px',
                         fontWeight: 800,
                         cursor: isUpdating ? 'not-allowed' : 'pointer',
                         display: 'flex',
@@ -1172,12 +1280,12 @@ export default function AdminOrdersPage() {
                   ) : order.status === 'DELIVERED' || order.status === 'COMPLETED' ? (
                     <div
                       style={{
-                        padding: '8px 12px',
+                        padding: '9px 12px',
                         backgroundColor: '#DCFCE7',
                         color: '#166534',
                         borderRadius: '6px',
-                        fontSize: '12.5px',
-                        fontWeight: 700,
+                        fontSize: '13px',
+                        fontWeight: 800,
                         textAlign: 'center',
                         border: '1px solid #BBF7D0'
                       }}
@@ -1187,12 +1295,12 @@ export default function AdminOrdersPage() {
                   ) : (
                     <div
                       style={{
-                        padding: '8px 12px',
+                        padding: '9px 12px',
                         backgroundColor: '#FEE2E2',
                         color: '#991B1B',
                         borderRadius: '6px',
-                        fontSize: '12.5px',
-                        fontWeight: 700,
+                        fontSize: '13px',
+                        fontWeight: 800,
                         textAlign: 'center',
                         border: '1px solid #FECACA'
                       }}
@@ -1340,9 +1448,9 @@ export default function AdminOrdersPage() {
                       ) : null;
                     })()}
 
-                    {/* Delete Order (Admin only) */}
+                    {/* Delete Order -> Opens In-App Modal */}
                     <button
-                      onClick={() => handleDeleteOrder(order)}
+                      onClick={() => setDeleteModalOrder(order)}
                       disabled={isUpdating}
                       style={{
                         padding: '5px 8px',
@@ -1392,183 +1500,337 @@ export default function AdminOrdersPage() {
             );
           })}
         </div>
-      ) : (
-        /* ================= COMPACT TABLE VIEW (FALLBACK) ================= */
+      )}
+
+      {/* ================= IN-APP POPUP MODAL 1: REJECT ORDER ================= */}
+      {rejectModalOrder && (
         <div
           style={{
-            backgroundColor: '#FFFFFF',
-            borderRadius: 'var(--cw-radius-lg)',
-            border: '1px solid var(--cw-color-border)',
-            boxShadow: 'var(--cw-shadow-sm)',
-            overflowX: 'auto'
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.65)',
+            backdropFilter: 'blur(3px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1200,
+            padding: '16px'
           }}
         >
-          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '13px' }}>
-            <thead>
-              <tr style={{ backgroundColor: '#F8FAFC', borderBottom: '1px solid var(--cw-color-border)' }}>
-                <th style={{ padding: '12px 14px', fontWeight: 700, color: '#475569' }}>Order & Time</th>
-                <th style={{ padding: '12px 14px', fontWeight: 700, color: '#475569' }}>Customer & Destination</th>
-                <th style={{ padding: '12px 14px', fontWeight: 700, color: '#475569' }}>Items Summary</th>
-                <th style={{ padding: '12px 14px', fontWeight: 700, color: '#475569' }}>Financials</th>
-                <th style={{ padding: '12px 14px', fontWeight: 700, color: '#475569' }}>Live Status</th>
-                <th style={{ padding: '12px 14px', fontWeight: 700, color: '#475569' }}>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredOrders.map(order => {
-                const badge = getStatusBadge(order.status);
-                const isUpdating = updatingId === order.id;
-                const isPending = order.status === 'PENDING' || order.status === 'NEW';
-                const cleanPhone = getCleanPhone(order.customer_phone);
+          <div
+            style={{
+              backgroundColor: '#FFFFFF',
+              borderRadius: '16px',
+              maxWidth: '440px',
+              width: '100%',
+              padding: '24px',
+              boxShadow: '0 20px 40px rgba(0,0,0,0.25)',
+              border: '1px solid #FCA5A5'
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '14px' }}>
+              <div
+                style={{
+                  width: '44px',
+                  height: '44px',
+                  borderRadius: '50%',
+                  backgroundColor: '#FEE2E2',
+                  color: '#DC2626',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '22px'
+                }}
+              >
+                🛑
+              </div>
+              <div>
+                <h3 style={{ fontSize: '18px', fontWeight: 800, color: '#991B1B', margin: 0 }}>
+                  Reject Order #{rejectModalOrder.order_number}?
+                </h3>
+                <p style={{ fontSize: '12.5px', color: '#64748B', margin: '2px 0 0' }}>
+                  Customer: <strong>{rejectModalOrder.customer_name || 'Guest'}</strong> • Total: <strong>₹{rejectModalOrder.grand_total}</strong>
+                </p>
+              </div>
+            </div>
 
-                return (
-                  <tr
-                    key={order.id}
-                    style={{
-                      borderBottom: '1px solid #F1F5F9',
-                      backgroundColor: isPending ? '#FFFBEB' : 'transparent'
-                    }}
-                  >
-                    <td style={{ padding: '12px 14px' }}>
-                      <a
-                        href={getInvoicePdfUrl(order.order_number)}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        style={{
-                          fontWeight: 800,
-                          color: '#1D4ED8',
-                          fontFamily: 'monospace',
-                          fontSize: '13px',
-                          textDecoration: 'none'
-                        }}
-                      >
-                        📄 {order.order_number} ↗
-                      </a>
-                      <div style={{ fontSize: '11px', color: '#64748B', marginTop: '2px' }}>
-                        {formatRelativeTime(order.created_at)}
-                      </div>
-                      <div style={{ fontSize: '10px', color: '#94A3B8', marginTop: '2px' }}>
-                        {order.order_type}
-                      </div>
-                    </td>
+            <p style={{ fontSize: '13px', color: '#475569', lineHeight: 1.5, marginBottom: '16px' }}>
+              Rejecting this order will cancel it immediately and update customer tracking to Cancelled. Please select the primary reason:
+            </p>
 
-                    <td style={{ padding: '12px 14px' }}>
-                      <div style={{ fontWeight: 700, color: '#0F172A' }}>{order.customer_name || 'Walk-in Guest'}</div>
-                      {order.customer_phone && (
-                        <div style={{ display: 'flex', gap: '4px', alignItems: 'center', marginTop: '2px' }}>
-                          <a href={`tel:${order.customer_phone}`} style={{ fontSize: '11.5px', color: '#1D4ED8', textDecoration: 'none', fontWeight: 600 }}>
-                            📞 {order.customer_phone}
-                          </a>
-                        </div>
-                      )}
-                      {order.delivery_address && (
-                        <div style={{ fontSize: '11.5px', color: '#475569', marginTop: '3px', maxWidth: '220px', lineHeight: 1.3 }}>
-                          📍 {order.delivery_address}
-                        </div>
-                      )}
-                      {order.special_instructions && (
-                        <div style={{ fontSize: '11px', color: '#D97706', marginTop: '3px', fontStyle: 'italic', maxWidth: '220px' }}>
-                          📝 {order.special_instructions}
-                        </div>
-                      )}
-                    </td>
+            <div style={{ marginBottom: '20px' }}>
+              <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#1E2328', marginBottom: '6px' }}>
+                Cancellation Reason:
+              </label>
+              <select
+                value={rejectReason}
+                onChange={e => setRejectReason(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '9px 12px',
+                  borderRadius: '8px',
+                  border: '1px solid #CBD5E1',
+                  fontSize: '13px',
+                  fontWeight: 600,
+                  backgroundColor: '#FAF5EE'
+                }}
+              >
+                <option value="Kitchen busy / Peak rush">Kitchen busy / Peak rush</option>
+                <option value="Items out of stock">Items out of stock</option>
+                <option value="Delivery address unreachable">Delivery address unreachable</option>
+                <option value="Customer requested cancellation">Customer requested cancellation</option>
+                <option value="Payment not received / fake order">Payment not received / fake order</option>
+                <option value="Store closing soon">Store closing soon</option>
+              </select>
+            </div>
 
-                    <td style={{ padding: '12px 14px' }}>
-                      {order.items && order.items.length > 0 ? (
-                        <div>
-                          {order.items.map((i, idx) => (
-                            <div key={idx} style={{ fontSize: '12px', color: '#334155' }}>
-                              <strong>{i.quantity}x</strong> {i.item_name}
-                            </div>
-                          ))}
-                        </div>
-                      ) : (
-                        <span style={{ fontSize: '12px', color: '#94A3B8' }}>{order.order_type}</span>
-                      )}
-                    </td>
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <button
+                onClick={() => setRejectModalOrder(null)}
+                style={{
+                  flex: 1,
+                  padding: '11px',
+                  backgroundColor: '#F1F5F9',
+                  border: '1px solid #CBD5E1',
+                  borderRadius: '8px',
+                  fontSize: '13px',
+                  fontWeight: 700,
+                  color: '#475569',
+                  cursor: 'pointer'
+                }}
+              >
+                Cancel / Keep Order
+              </button>
+              <button
+                onClick={handleConfirmReject}
+                style={{
+                  flex: 1,
+                  padding: '11px',
+                  backgroundColor: '#DC2626',
+                  border: 'none',
+                  borderRadius: '8px',
+                  fontSize: '13px',
+                  fontWeight: 800,
+                  color: '#FFFFFF',
+                  cursor: 'pointer',
+                  boxShadow: '0 2px 8px rgba(220, 38, 38, 0.3)'
+                }}
+              >
+                ✕ Yes, Reject Order
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
-                    <td style={{ padding: '12px 14px' }}>
-                      <div style={{ fontWeight: 800, color: '#0F172A', fontSize: '13.5px' }}>
-                        ₹{Number(order.grand_total).toFixed(2)}
-                      </div>
-                      <div style={{ display: 'flex', gap: '4px', marginTop: '4px', flexWrap: 'wrap' }}>
-                        <span style={{ fontSize: '10px', fontWeight: 700, padding: '2px 5px', borderRadius: '4px', backgroundColor: '#F1F5F9' }}>
-                          {order.payment_mode || 'CASH'}
-                        </span>
-                        <span style={{ fontSize: '10px', fontWeight: 700, padding: '2px 5px', borderRadius: '4px', backgroundColor: order.payment_status === 'PAID' ? '#DCFCE7' : '#FEF3C7', color: order.payment_status === 'PAID' ? '#16A34A' : '#D97706' }}>
-                          {order.payment_status || 'PENDING'}
-                        </span>
-                      </div>
-                    </td>
+      {/* ================= IN-APP POPUP MODAL 2: DELETE ORDER ================= */}
+      {deleteModalOrder && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.65)',
+            backdropFilter: 'blur(3px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1200,
+            padding: '16px'
+          }}
+        >
+          <div
+            style={{
+              backgroundColor: '#FFFFFF',
+              borderRadius: '16px',
+              maxWidth: '420px',
+              width: '100%',
+              padding: '24px',
+              boxShadow: '0 20px 40px rgba(0,0,0,0.25)',
+              border: '1px solid #FCA5A5'
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '14px' }}>
+              <div
+                style={{
+                  width: '44px',
+                  height: '44px',
+                  borderRadius: '50%',
+                  backgroundColor: '#FEE2E2',
+                  color: '#7F1D1D',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '22px'
+                }}
+              >
+                🗑️
+              </div>
+              <div>
+                <h3 style={{ fontSize: '18px', fontWeight: 800, color: '#7F1D1D', margin: 0 }}>
+                  Permanently Delete Order #{deleteModalOrder.order_number}?
+                </h3>
+                <p style={{ fontSize: '12.5px', color: '#64748B', margin: '2px 0 0' }}>
+                  Customer: <strong>{deleteModalOrder.customer_name || 'Guest'}</strong>
+                </p>
+              </div>
+            </div>
 
-                    <td style={{ padding: '12px 14px' }}>
-                      <span style={{ padding: '4px 8px', borderRadius: '12px', fontSize: '11px', fontWeight: 700, backgroundColor: badge.bg, color: badge.color, border: `1px solid ${badge.border}` }}>
-                        {badge.label}
-                      </span>
-                    </td>
+            <p style={{ fontSize: '13px', color: '#475569', lineHeight: 1.5, marginBottom: '20px' }}>
+              ⚠️ This order will be permanently erased from Supabase PostgreSQL database. This action is irreversible.
+            </p>
 
-                    <td style={{ padding: '12px 14px' }}>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                        {isPending ? (
-                          <button
-                            onClick={() => handleStatusChange(order.id, 'CONFIRMED')}
-                            disabled={isUpdating}
-                            style={{ padding: '6px 10px', backgroundColor: '#16A34A', color: '#FFFFFF', border: 'none', borderRadius: '6px', fontSize: '11px', fontWeight: 700, cursor: 'pointer' }}
-                          >
-                            ✓ Accept & Confirm
-                          </button>
-                        ) : order.status === 'CONFIRMED' ? (
-                          <button
-                            onClick={() => handleStatusChange(order.id, 'PREPARING')}
-                            disabled={isUpdating}
-                            style={{ padding: '6px 10px', backgroundColor: '#0284C7', color: '#FFFFFF', border: 'none', borderRadius: '6px', fontSize: '11px', fontWeight: 700, cursor: 'pointer' }}
-                          >
-                            🍳 Start Preparing
-                          </button>
-                        ) : order.status === 'PREPARING' ? (
-                          <button
-                            onClick={() => handleStatusChange(order.id, 'READY')}
-                            disabled={isUpdating}
-                            style={{ padding: '6px 10px', backgroundColor: '#0D9488', color: '#FFFFFF', border: 'none', borderRadius: '6px', fontSize: '11px', fontWeight: 700, cursor: 'pointer' }}
-                          >
-                            🥡 Mark Ready
-                          </button>
-                        ) : order.status === 'READY' ? (
-                          <button
-                            onClick={() => handleStatusChange(order.id, order.order_type === 'DIRECT_DELIVERY' ? 'OUT_FOR_DELIVERY' : 'DELIVERED')}
-                            disabled={isUpdating}
-                            style={{ padding: '6px 10px', backgroundColor: '#7C3AED', color: '#FFFFFF', border: 'none', borderRadius: '6px', fontSize: '11px', fontWeight: 700, cursor: 'pointer' }}
-                          >
-                            {order.order_type === 'DIRECT_DELIVERY' ? '🛵 Send Out' : '✔️ Delivered'}
-                          </button>
-                        ) : order.status === 'OUT_FOR_DELIVERY' ? (
-                          <button
-                            onClick={() => handleStatusChange(order.id, 'DELIVERED')}
-                            disabled={isUpdating}
-                            style={{ padding: '6px 10px', backgroundColor: '#16A34A', color: '#FFFFFF', border: 'none', borderRadius: '6px', fontSize: '11px', fontWeight: 700, cursor: 'pointer' }}
-                          >
-                            ✔️ Mark Delivered
-                          </button>
-                        ) : null}
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <button
+                onClick={() => setDeleteModalOrder(null)}
+                style={{
+                  flex: 1,
+                  padding: '11px',
+                  backgroundColor: '#F1F5F9',
+                  border: '1px solid #CBD5E1',
+                  borderRadius: '8px',
+                  fontSize: '13px',
+                  fontWeight: 700,
+                  color: '#475569',
+                  cursor: 'pointer'
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleConfirmDelete}
+                style={{
+                  flex: 1,
+                  padding: '11px',
+                  backgroundColor: '#7F1D1D',
+                  border: 'none',
+                  borderRadius: '8px',
+                  fontSize: '13px',
+                  fontWeight: 800,
+                  color: '#FFFFFF',
+                  cursor: 'pointer'
+                }}
+              >
+                🗑️ Yes, Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
-                        <div style={{ display: 'flex', gap: '3px', flexWrap: 'wrap' }}>
-                          <button onClick={() => handleOpenReceiptModal(order, 'CUSTOMER_BILL')} style={{ padding: '3px 6px', backgroundColor: '#166534', color: '#FFFFFF', border: 'none', borderRadius: '4px', fontSize: '10px', fontWeight: 700, cursor: 'pointer' }}>
-                            🧾 Bill
-                          </button>
-                          <button onClick={() => handleOpenReceiptModal(order, 'KOT')} style={{ padding: '3px 6px', backgroundColor: '#334155', color: '#FFFFFF', border: 'none', borderRadius: '4px', fontSize: '10px', fontWeight: 700, cursor: 'pointer' }}>
-                            🍳 KOT
-                          </button>
-                          <button onClick={() => handleDeleteOrder(order)} style={{ padding: '3px 6px', backgroundColor: '#7F1D1D', color: '#FFFFFF', border: 'none', borderRadius: '4px', fontSize: '10px', fontWeight: 700, cursor: 'pointer' }}>
-                            🗑️
-                          </button>
-                        </div>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+      {/* ================= IN-APP POPUP MODAL 3: VERIFY UPI PAYMENT ================= */}
+      {verifyUpiOrder && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.65)',
+            backdropFilter: 'blur(3px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1200,
+            padding: '16px'
+          }}
+        >
+          <div
+            style={{
+              backgroundColor: '#FFFFFF',
+              borderRadius: '16px',
+              maxWidth: '430px',
+              width: '100%',
+              padding: '24px',
+              boxShadow: '0 20px 40px rgba(0,0,0,0.25)',
+              border: '1px solid #BBF7D0'
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '14px' }}>
+              <div
+                style={{
+                  width: '44px',
+                  height: '44px',
+                  borderRadius: '50%',
+                  backgroundColor: '#DCFCE7',
+                  color: '#16A34A',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '22px'
+                }}
+              >
+                📱
+              </div>
+              <div>
+                <h3 style={{ fontSize: '18px', fontWeight: 800, color: '#166534', margin: 0 }}>
+                  Verify UPI Payment #{verifyUpiOrder.order_number}
+                </h3>
+                <p style={{ fontSize: '12.5px', color: '#64748B', margin: '2px 0 0' }}>
+                  Order Total: <strong>₹{verifyUpiOrder.grand_total}</strong>
+                </p>
+              </div>
+            </div>
+
+            <p style={{ fontSize: '13px', color: '#475569', lineHeight: 1.5, marginBottom: '16px' }}>
+              Confirm receipt in your UPI bank app (BHIM / PhonePe / GPay) and enter the 12-digit UTR reference:
+            </p>
+
+            <div style={{ marginBottom: '20px' }}>
+              <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#1E2328', marginBottom: '6px' }}>
+                Bank UTR / Transaction Reference:
+              </label>
+              <input
+                type="text"
+                value={verifyUpiUtr}
+                onChange={e => setVerifyUpiUtr(e.target.value)}
+                placeholder="e.g. 432198765432"
+                style={{
+                  width: '100%',
+                  padding: '10px 12px',
+                  borderRadius: '8px',
+                  border: '1px solid #CBD5E1',
+                  fontSize: '14px',
+                  fontFamily: 'monospace',
+                  fontWeight: 700,
+                  backgroundColor: '#F8FAFC'
+                }}
+              />
+            </div>
+
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <button
+                onClick={() => setVerifyUpiOrder(null)}
+                style={{
+                  flex: 1,
+                  padding: '11px',
+                  backgroundColor: '#F1F5F9',
+                  border: '1px solid #CBD5E1',
+                  borderRadius: '8px',
+                  fontSize: '13px',
+                  fontWeight: 700,
+                  color: '#475569',
+                  cursor: 'pointer'
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleConfirmVerifyPayment}
+                style={{
+                  flex: 1,
+                  padding: '11px',
+                  backgroundColor: '#16A34A',
+                  border: 'none',
+                  borderRadius: '8px',
+                  fontSize: '13px',
+                  fontWeight: 800,
+                  color: '#FFFFFF',
+                  cursor: 'pointer',
+                  boxShadow: '0 2px 8px rgba(22, 163, 74, 0.3)'
+                }}
+              >
+                ✓ Confirm & Mark PAID
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

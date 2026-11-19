@@ -10,6 +10,7 @@ export default function AdminCateringPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
+  const [dateFilter, setDateFilter] = useState<'all' | 'today' | 'yesterday' | 'week' | 'month'>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [actionSuccess, setActionSuccess] = useState<string | null>(null);
@@ -121,7 +122,37 @@ export default function AdminCateringPage() {
     }
   };
 
+  const isWithinDateFilter = (dateStr: string, filter: 'all' | 'today' | 'yesterday' | 'week' | 'month') => {
+    if (filter === 'all') return true;
+    try {
+      const d = new Date(dateStr);
+      const now = new Date();
+      const pad = (n: number) => String(n).padStart(2, '0');
+      const dateKey = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+      const todayKey = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+
+      const y = new Date(now);
+      y.setDate(y.getDate() - 1);
+      const yesterdayKey = `${y.getFullYear()}-${pad(y.getMonth() + 1)}-${pad(y.getDate())}`;
+
+      if (filter === 'today') return dateKey === todayKey;
+      if (filter === 'yesterday') return dateKey === yesterdayKey;
+      if (filter === 'week') {
+        const diffMs = now.getTime() - d.getTime();
+        const diffDays = diffMs / (1000 * 60 * 60 * 24);
+        return diffDays >= 0 && diffDays <= 7;
+      }
+      if (filter === 'month') {
+        return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+      }
+    } catch {}
+    return true;
+  };
+
   const filteredLeads = leads.filter(lead => {
+    const dateVal = lead.createdAt || (lead as any).created_at || '';
+    if (!isWithinDateFilter(dateVal, dateFilter)) return false;
+
     const matchesStatus = statusFilter === 'ALL' || lead.status === statusFilter;
     if (!matchesStatus) return false;
 
@@ -190,10 +221,8 @@ export default function AdminCateringPage() {
       <div
         style={{
           display: 'flex',
-          gap: '16px',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          flexWrap: 'wrap',
+          flexDirection: 'column',
+          gap: '14px',
           backgroundColor: '#FFFFFF',
           padding: '16px 20px',
           borderRadius: 'var(--cw-radius-md)',
@@ -201,32 +230,63 @@ export default function AdminCateringPage() {
           marginBottom: '20px'
         }}
       >
-        {/* Status Pills */}
-        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-          {['ALL', 'NEW', 'CONTACTED', 'QUOTED', 'CONFIRMED', 'FULFILLED', 'CANCELLED'].map(status => (
+        {/* Date Filter Tabs */}
+        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
+          <span style={{ fontSize: '12px', fontWeight: 800, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.04em', marginRight: '4px' }}>
+            Period:
+          </span>
+          {[
+            { id: 'all', label: 'All Leads' },
+            { id: 'today', label: 'Today' },
+            { id: 'yesterday', label: 'Yesterday' },
+            { id: 'week', label: 'Last 7 Days' },
+            { id: 'month', label: 'This Month' }
+          ].map(tab => (
             <button
-              key={status}
-              onClick={() => setStatusFilter(status)}
+              key={tab.id}
+              onClick={() => setDateFilter(tab.id as any)}
               style={{
-                padding: '6px 14px',
-                borderRadius: '20px',
+                padding: '5px 12px',
+                borderRadius: '6px',
                 fontSize: '12px',
-                fontWeight: 600,
+                fontWeight: 700,
                 cursor: 'pointer',
-                border: 'none',
-                backgroundColor: statusFilter === status ? '#6F432A' : '#F4F6F8',
-                color: statusFilter === status ? '#FFFFFF' : '#64748B',
-                transition: 'all 0.15s ease'
+                border: dateFilter === tab.id ? '1px solid #1E2328' : '1px solid #E2E8F0',
+                backgroundColor: dateFilter === tab.id ? '#1E2328' : '#F8FAFC',
+                color: dateFilter === tab.id ? '#FFFFFF' : '#475569'
               }}
             >
-              {status}
+              {tab.label}
             </button>
           ))}
         </div>
 
-        {/* Search input */}
-        <input
-          type="text"
+        {/* Status Pills & Search */}
+        <div style={{ display: 'flex', gap: '16px', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', borderTop: '1px solid #F1F5F9', paddingTop: '12px' }}>
+          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+            {['ALL', 'NEW', 'CONTACTED', 'QUOTED', 'CONFIRMED', 'FULFILLED', 'CANCELLED'].map(status => (
+              <button
+                key={status}
+                onClick={() => setStatusFilter(status)}
+                style={{
+                  padding: '6px 14px',
+                  borderRadius: '20px',
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  border: 'none',
+                  backgroundColor: statusFilter === status ? '#6F432A' : '#F4F6F8',
+                  color: statusFilter === status ? '#FFFFFF' : '#64748B',
+                  transition: 'all 0.15s ease'
+                }}
+              >
+                {status}
+              </button>
+            ))}
+          </div>
+
+          <input
+            type="text"
           placeholder="Search leads by #, name, company, phone, event type, or keywords..."
           value={searchQuery}
           onChange={e => setSearchQuery(e.target.value)}
@@ -238,6 +298,7 @@ export default function AdminCateringPage() {
             minWidth: '260px'
           }}
         />
+        </div>
       </div>
 
       {/* Leads Table */}

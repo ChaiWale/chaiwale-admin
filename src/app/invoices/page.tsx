@@ -19,6 +19,35 @@ export default function AdminInvoicesPage() {
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
+  const [dateFilter, setDateFilter] = useState<'all' | 'today' | 'yesterday' | 'week' | 'month'>('all');
+
+  // Date Filter Evaluator
+  const isWithinDateFilter = (dateStr: string, filter: 'all' | 'today' | 'yesterday' | 'week' | 'month') => {
+    if (filter === 'all') return true;
+    try {
+      const d = new Date(dateStr);
+      const now = new Date();
+      const pad = (n: number) => String(n).padStart(2, '0');
+      const dateKey = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+      const todayKey = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+
+      const y = new Date(now);
+      y.setDate(y.getDate() - 1);
+      const yesterdayKey = `${y.getFullYear()}-${pad(y.getMonth() + 1)}-${pad(y.getDate())}`;
+
+      if (filter === 'today') return dateKey === todayKey;
+      if (filter === 'yesterday') return dateKey === yesterdayKey;
+      if (filter === 'week') {
+        const diffMs = now.getTime() - d.getTime();
+        const diffDays = diffMs / (1000 * 60 * 60 * 24);
+        return diffDays >= 0 && diffDays <= 7;
+      }
+      if (filter === 'month') {
+        return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+      }
+    } catch {}
+    return true;
+  };
 
   // View Bill Modal State
   const [viewInvoice, setViewInvoice] = useState<InvoiceDetailDto | null>(null);
@@ -62,6 +91,9 @@ export default function AdminInvoicesPage() {
   }, [statusFilter]);
 
   const filteredInvoices = invoices.filter((inv) => {
+    const dateVal = inv.issued_at || (inv as any).created_at || '';
+    if (!isWithinDateFilter(dateVal, dateFilter)) return false;
+
     const rawQuery = searchQuery.toLowerCase().trim();
     const keywords = rawQuery ? rawQuery.split(/\s+/).filter(Boolean) : [];
     if (keywords.length === 0) return true;
@@ -230,10 +262,8 @@ export default function AdminInvoicesPage() {
       <div
         style={{
           display: 'flex',
-          gap: '16px',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          flexWrap: 'wrap',
+          flexDirection: 'column',
+          gap: '14px',
           backgroundColor: '#FFFFFF',
           padding: '16px 20px',
           borderRadius: 'var(--cw-radius-md)',
@@ -241,25 +271,30 @@ export default function AdminInvoicesPage() {
           marginBottom: '20px'
         }}
       >
-        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+        {/* Date Filter Tabs */}
+        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
+          <span style={{ fontSize: '12px', fontWeight: 800, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.04em', marginRight: '4px' }}>
+            Period:
+          </span>
           {[
-            { id: 'ALL', label: 'All Invoices' },
-            { id: 'UNPAID', label: 'Unpaid / Credit' },
-            { id: 'PARTIALLY_PAID', label: 'Partially Paid' },
-            { id: 'PAID', label: 'Fully Paid' }
-          ].map((tab) => (
+            { id: 'all', label: 'All Time' },
+            { id: 'today', label: 'Today' },
+            { id: 'yesterday', label: 'Yesterday' },
+            { id: 'week', label: 'Last 7 Days' },
+            { id: 'month', label: 'This Month' }
+          ].map(tab => (
             <button
               key={tab.id}
-              onClick={() => setStatusFilter(tab.id)}
+              onClick={() => setDateFilter(tab.id as any)}
               style={{
-                padding: '6px 14px',
-                borderRadius: '20px',
+                padding: '5px 12px',
+                borderRadius: '6px',
                 fontSize: '12px',
-                fontWeight: 600,
+                fontWeight: 700,
                 cursor: 'pointer',
-                border: 'none',
-                backgroundColor: statusFilter === tab.id ? 'var(--cw-color-primary)' : '#F1F5F9',
-                color: statusFilter === tab.id ? '#FFFFFF' : '#64748B'
+                border: dateFilter === tab.id ? '1px solid #1E2328' : '1px solid #E2E8F0',
+                backgroundColor: dateFilter === tab.id ? '#1E2328' : '#F8FAFC',
+                color: dateFilter === tab.id ? '#FFFFFF' : '#475569'
               }}
             >
               {tab.label}
@@ -267,19 +302,48 @@ export default function AdminInvoicesPage() {
           ))}
         </div>
 
-        <input
-          type="text"
-          placeholder="Search invoices by number, client, company, department, status, or keywords..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          style={{
-            padding: '8px 14px',
-            border: '1px solid var(--cw-color-border)',
-            borderRadius: 'var(--cw-radius-md)',
-            fontSize: '13px',
-            minWidth: '260px'
-          }}
-        />
+        {/* Status Filter & Search */}
+        <div style={{ display: 'flex', gap: '16px', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', borderTop: '1px solid #F1F5F9', paddingTop: '12px' }}>
+          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+            {[
+              { id: 'ALL', label: 'All Invoices' },
+              { id: 'UNPAID', label: 'Unpaid / Credit' },
+              { id: 'PARTIALLY_PAID', label: 'Partially Paid' },
+              { id: 'PAID', label: 'Fully Paid' }
+            ].map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setStatusFilter(tab.id)}
+                style={{
+                  padding: '6px 14px',
+                  borderRadius: '20px',
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  border: 'none',
+                  backgroundColor: statusFilter === tab.id ? 'var(--cw-color-primary)' : '#F1F5F9',
+                  color: statusFilter === tab.id ? '#FFFFFF' : '#64748B'
+                }}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+
+          <input
+            type="text"
+            placeholder="Search invoices by number, client, company, department, status, or keywords..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            style={{
+              padding: '8px 14px',
+              border: '1px solid var(--cw-color-border)',
+              borderRadius: 'var(--cw-radius-md)',
+              fontSize: '13px',
+              minWidth: '260px'
+            }}
+          />
+        </div>
       </div>
 
       {/* Invoices Table */}
