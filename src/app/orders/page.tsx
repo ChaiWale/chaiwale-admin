@@ -1409,13 +1409,19 @@ export default function AdminOrdersPage() {
                               orderNumber: order.order_number,
                               total: order.grand_total,
                               paymentMode: order.payment_mode || 'CASH',
-                              trackingUrl: 'https://chaiwale.co.in'
+                              trackingUrl: `https://chaiwale.co.in/track?order=${encodeURIComponent(order.order_number)}`
                             })
                           : order.status === 'READY'
                           ? (WhatsAppTemplates.ORDER_READY as any)({
                               customerName: order.customer_name || 'Customer',
                               orderNumber: order.order_number,
                               total: order.grand_total
+                            })
+                          : (order.status === 'COMPLETED' || order.status === 'DELIVERED')
+                          ? (WhatsAppTemplates.ORDER_DELIVERED_REVIEW as any)({
+                              customerName: order.customer_name || 'Customer',
+                              orderNumber: order.order_number,
+                              googleReviewUrl: 'https://g.page/r/Ca1qOd1BBfkEEBM/review'
                             })
                           : (msgFn as any)({
                               customerName: order.customer_name || 'Customer',
