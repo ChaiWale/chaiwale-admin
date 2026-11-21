@@ -38,6 +38,22 @@ export default function AdminMenuPage() {
   const [togglingId, setTogglingId] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<string | null>(null);
 
+  // Zomato Multi-Select Filter Dropdown State
+  const [showFilterDropdown, setShowFilterDropdown] = useState(false);
+  const [filterInStock, setFilterInStock] = useState(false);
+  const [filterOutOfStock, setFilterOutOfStock] = useState(false);
+  const [filterWithMedia, setFilterWithMedia] = useState(false);
+  const [filterWithoutMedia, setFilterWithoutMedia] = useState(false);
+  const [filterVegOnly, setFilterVegOnly] = useState(false);
+
+  // Pagination State (5 dishes per page as requested by user)
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const [pageSize, setPageSize] = useState<number>(5);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [selectedCategoryFilter, searchQuery, filterInStock, filterOutOfStock, filterWithMedia, filterWithoutMedia, filterVegOnly, availabilityFilter]);
+
   // Add Category Modal State
   const [showAddCategoryModal, setShowAddCategoryModal] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState('');
@@ -350,12 +366,21 @@ export default function AdminMenuPage() {
   };
 
   const filteredItems = items.filter(item => {
-    const matchesFilter =
-      availabilityFilter === 'ALL' ||
-      (availabilityFilter === 'AVAILABLE' && item.is_available) ||
-      (availabilityFilter === 'UNAVAILABLE' && !item.is_available);
+    // Category filter
     const matchesCategory =
       selectedCategoryFilter === 'ALL' || item.category_id === selectedCategoryFilter;
+    if (!matchesCategory) return false;
+
+    // Availability filter from buttons
+    if (availabilityFilter === 'AVAILABLE' && !item.is_available) return false;
+    if (availabilityFilter === 'UNAVAILABLE' && item.is_available) return false;
+
+    // Zomato Multi-Select Dropdown Filters
+    if (filterInStock && !item.is_available) return false;
+    if (filterOutOfStock && item.is_available) return false;
+    if (filterWithMedia && !item.image_path) return false;
+    if (filterWithoutMedia && Boolean(item.image_path)) return false;
+    if (filterVegOnly && (!item.is_veg || item.is_egg)) return false;
 
     const rawQuery = searchQuery.toLowerCase().trim();
     const keywords = rawQuery ? rawQuery.split(/\s+/).filter(Boolean) : [];
@@ -381,11 +406,21 @@ export default function AdminMenuPage() {
       matchesSearch = keywords.every(kw => searchable.includes(kw));
     }
 
-    return matchesFilter && matchesCategory && matchesSearch;
+    return matchesSearch;
   });
 
   const availableCount = items.filter(i => i.is_available).length;
   const unavailableCount = items.filter(i => !i.is_available).length;
+  const outOfStockCount = unavailableCount;
+  const inStockCount = availableCount;
+  const withMediaCount = items.filter(i => Boolean(i.image_path)).length;
+  const withoutMediaCount = items.filter(i => !i.image_path).length;
+  const vegCount = items.filter(i => i.is_veg && !i.is_egg).length;
+
+  // Pagination calculation
+  const totalItems = filteredItems.length;
+  const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
+  const paginatedItems = filteredItems.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
   return (
     <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
@@ -483,181 +518,341 @@ export default function AdminMenuPage() {
         </div>
       )}
 
-      {/* Categories Tabs */}
-      <div
-        style={{
-          display: 'flex',
-          gap: '8px',
-          overflowX: 'auto',
-          paddingBottom: '12px',
-          marginBottom: '16px',
-          whiteSpace: 'nowrap'
-        }}
-      >
-        <button
-          onClick={() => setSelectedCategoryFilter('ALL')}
+      {/* ========================================================================= */}
+      {/* 2-COLUMN ZOMATO PARTNER MENU EDITOR LAYOUT                                */}
+      {/* ========================================================================= */}
+      <div style={{ display: 'flex', gap: '20px', alignItems: 'flex-start', flexWrap: 'wrap' }}>
+        
+        {/* Left Column: Categories List (Zomato Partner Style) */}
+        <div
           style={{
-            padding: '8px 18px',
-            borderRadius: '20px',
-            fontSize: '13px',
-            fontWeight: 700,
-            cursor: 'pointer',
-            border: selectedCategoryFilter === 'ALL' ? '2px solid var(--cw-color-primary)' : '1px solid var(--cw-color-border)',
-            backgroundColor: selectedCategoryFilter === 'ALL' ? '#FEF3C7' : '#FFFFFF',
-            color: selectedCategoryFilter === 'ALL' ? '#B45309' : '#475569',
-            boxShadow: selectedCategoryFilter === 'ALL' ? '0 2px 6px rgba(180, 83, 9, 0.15)' : 'none'
+            width: '260px',
+            backgroundColor: '#FFFFFF',
+            borderRadius: '12px',
+            border: '1px solid #E2E8F0',
+            padding: '16px',
+            boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+            flexShrink: 0,
+            position: 'sticky',
+            top: '80px',
+            maxHeight: 'calc(100vh - 120px)',
+            display: 'flex',
+            flexDirection: 'column'
           }}
         >
-          🍽️ All Categories ({items.length})
-        </button>
-        {categories.map((cat) => {
-          const count = items.filter((i) => i.category_id === cat.id).length;
-          const isSelected = selectedCategoryFilter === cat.id;
-          return (
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', paddingBottom: '10px', borderBottom: '1px solid #F1F5F9', flexShrink: 0 }}>
+            <span style={{ fontSize: '14px', fontWeight: 800, color: '#0F172A' }}>
+              Categories ({categories.length})
+            </span>
             <button
-              key={cat.id}
-              onClick={() => setSelectedCategoryFilter(cat.id)}
-              style={{
-                padding: '8px 16px',
-                borderRadius: '20px',
-                fontSize: '13px',
-                fontWeight: 700,
-                cursor: 'pointer',
-                border: isSelected ? '2px solid var(--cw-color-primary)' : '1px solid var(--cw-color-border)',
-                backgroundColor: isSelected ? '#FEF3C7' : '#FFFFFF',
-                color: isSelected ? '#B45309' : '#475569',
-                boxShadow: isSelected ? '0 2px 6px rgba(180, 83, 9, 0.15)' : 'none'
+              onClick={() => {
+                setAddCategoryError(null);
+                setShowAddCategoryModal(true);
               }}
-            >
-              {cat.name} ({count})
-            </button>
-          );
-        })}
-      </div>
-
-      {/* Search, Filter & View Controls */}
-      <div
-        style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          flexWrap: 'wrap',
-          gap: '12px',
-          backgroundColor: '#FFFFFF',
-          padding: '14px 18px',
-          borderRadius: 'var(--cw-radius-md)',
-          border: '1px solid var(--cw-color-border)',
-          marginBottom: '20px'
-        }}
-      >
-        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
-          <button
-            onClick={() => setAvailabilityFilter('ALL')}
-            style={{
-              padding: '6px 14px',
-              borderRadius: '20px',
-              fontSize: '12px',
-              fontWeight: 700,
-              cursor: 'pointer',
-              border: 'none',
-              backgroundColor: availabilityFilter === 'ALL' ? 'var(--cw-color-primary)' : '#F4F6F8',
-              color: availabilityFilter === 'ALL' ? '#FFFFFF' : '#64748B'
-            }}
-          >
-            All Items ({items.length})
-          </button>
-          <button
-            onClick={() => setAvailabilityFilter('AVAILABLE')}
-            style={{
-              padding: '6px 14px',
-              borderRadius: '20px',
-              fontSize: '12px',
-              fontWeight: 700,
-              cursor: 'pointer',
-              border: 'none',
-              backgroundColor: availabilityFilter === 'AVAILABLE' ? '#16A34A' : '#F4F6F8',
-              color: availabilityFilter === 'AVAILABLE' ? '#FFFFFF' : '#64748B'
-            }}
-          >
-            ● In Stock ({availableCount})
-          </button>
-          <button
-            onClick={() => setAvailabilityFilter('UNAVAILABLE')}
-            style={{
-              padding: '6px 14px',
-              borderRadius: '20px',
-              fontSize: '12px',
-              fontWeight: 700,
-              cursor: 'pointer',
-              border: 'none',
-              backgroundColor: availabilityFilter === 'UNAVAILABLE' ? '#DC2626' : '#F4F6F8',
-              color: availabilityFilter === 'UNAVAILABLE' ? '#FFFFFF' : '#64748B'
-            }}
-          >
-            ✕ Out of Stock ({unavailableCount})
-          </button>
-        </div>
-
-        <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
-          {/* Dual View Toggle */}
-          <div style={{ display: 'flex', gap: '2px', backgroundColor: '#F1F5F9', padding: '3px', borderRadius: '8px', border: '1px solid #E2E8F0' }}>
-            <button
-              type="button"
-              onClick={() => setViewMode('cards')}
               style={{
-                padding: '6px 12px',
-                borderRadius: '6px',
-                border: 'none',
                 fontSize: '12px',
                 fontWeight: 700,
-                cursor: 'pointer',
-                backgroundColor: viewMode === 'cards' ? '#FFFFFF' : 'transparent',
-                color: viewMode === 'cards' ? 'var(--cw-color-primary)' : '#64748B',
-                boxShadow: viewMode === 'cards' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '5px'
-              }}
-            >
-              <span>⊞</span> Card View
-            </button>
-            <button
-              type="button"
-              onClick={() => setViewMode('list')}
-              style={{
-                padding: '6px 12px',
-                borderRadius: '6px',
+                color: '#2563EB',
+                background: 'none',
                 border: 'none',
-                fontSize: '12px',
-                fontWeight: 700,
                 cursor: 'pointer',
-                backgroundColor: viewMode === 'list' ? '#FFFFFF' : 'transparent',
-                color: viewMode === 'list' ? 'var(--cw-color-primary)' : '#64748B',
-                boxShadow: viewMode === 'list' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '5px'
+                padding: '2px 4px'
               }}
             >
-              <span>☰</span> List View
+              + Add
             </button>
           </div>
 
-          <input
-            type="text"
-            placeholder="Search dishes by name, category, tags..."
-            value={searchQuery}
-            onChange={e => setSearchQuery(e.target.value)}
+          <div
             style={{
-              padding: '8px 14px',
-              border: '1px solid var(--cw-color-border)',
-              borderRadius: 'var(--cw-radius-md)',
-              fontSize: '13px',
-              minWidth: '260px'
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '4px',
+              overflowY: 'auto',
+              flex: 1,
+              paddingRight: '4px'
             }}
-          />
+          >
+            {/* All Dishes Option */}
+            <button
+              type="button"
+              onClick={() => setSelectedCategoryFilter('ALL')}
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                padding: '9px 12px',
+                borderRadius: '8px',
+                fontSize: '13px',
+                fontWeight: 700,
+                cursor: 'pointer',
+                border: 'none',
+                backgroundColor: selectedCategoryFilter === 'ALL' ? '#E2E8F0' : 'transparent',
+                color: selectedCategoryFilter === 'ALL' ? '#0F172A' : '#475569',
+                textAlign: 'left',
+                transition: 'all 0.15s ease'
+              }}
+            >
+              <span>🍽️ All Dishes</span>
+              <span style={{ fontSize: '11px', fontWeight: 800, padding: '2px 7px', borderRadius: '10px', backgroundColor: selectedCategoryFilter === 'ALL' ? '#CBD5E1' : '#F1F5F9', color: '#475569' }}>
+                {items.length}
+              </span>
+            </button>
+
+            {/* Individual Categories */}
+            {categories.map((cat) => {
+              const count = items.filter(i => i.category_id === cat.id).length;
+              const isSelected = selectedCategoryFilter === cat.id;
+              return (
+                <button
+                  key={cat.id}
+                  type="button"
+                  onClick={() => setSelectedCategoryFilter(cat.id)}
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    padding: '9px 12px',
+                    borderRadius: '8px',
+                    fontSize: '13px',
+                    fontWeight: isSelected ? 800 : 600,
+                    cursor: 'pointer',
+                    border: 'none',
+                    backgroundColor: isSelected ? '#E2E8F0' : 'transparent',
+                    color: isSelected ? '#0F172A' : '#475569',
+                    textAlign: 'left',
+                    transition: 'all 0.15s ease'
+                  }}
+                >
+                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', paddingRight: '6px' }}>
+                    {cat.name}
+                  </span>
+                  <span style={{ fontSize: '11px', fontWeight: 800, padding: '2px 7px', borderRadius: '10px', backgroundColor: isSelected ? '#CBD5E1' : '#F1F5F9', color: '#475569', flexShrink: 0 }}>
+                    {count}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
         </div>
-      </div>
+
+        {/* Right Column: Breadcrumb + Toolbar + Dishes Container */}
+        <div style={{ flex: 1, minWidth: '320px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          {/* Top Breadcrumb & Toolbar */}
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              flexWrap: 'wrap',
+              gap: '12px',
+              backgroundColor: '#FFFFFF',
+              padding: '12px 18px',
+              borderRadius: '12px',
+              border: '1px solid #E2E8F0',
+              boxShadow: '0 1px 3px rgba(0,0,0,0.03)'
+            }}
+          >
+            {/* Breadcrumb info */}
+            <div>
+              <div style={{ fontSize: '11.5px', color: '#64748B', fontWeight: 600 }}>
+                Menu &gt; {selectedCategoryFilter === 'ALL' ? 'All Dishes' : categories.find(c => c.id === selectedCategoryFilter)?.name}
+              </div>
+              <div style={{ fontSize: '15px', fontWeight: 800, color: '#0F172A', marginTop: '1px' }}>
+                {selectedCategoryFilter === 'ALL' ? 'All Dishes' : categories.find(c => c.id === selectedCategoryFilter)?.name} ({filteredItems.length})
+              </div>
+            </div>
+
+            {/* Controls: Search + Filters + View Toggle */}
+            <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+              <input
+                type="text"
+                placeholder="Search dishes by name, tag..."
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                style={{
+                  padding: '7px 12px',
+                  border: '1px solid #CBD5E1',
+                  borderRadius: '8px',
+                  fontSize: '12.5px',
+                  minWidth: '200px',
+                  outline: 'none'
+                }}
+              />
+
+              {/* Zomato Multi-Select Filter Dropdown */}
+              <div style={{ position: 'relative' }}>
+                <button
+                  type="button"
+                  onClick={() => setShowFilterDropdown(!showFilterDropdown)}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    padding: '7px 14px',
+                    borderRadius: '8px',
+                    border: '1px solid #CBD5E1',
+                    backgroundColor: (filterInStock || filterOutOfStock || filterWithMedia || filterWithoutMedia || filterVegOnly) ? '#EFF6FF' : '#FFFFFF',
+                    color: (filterInStock || filterOutOfStock || filterWithMedia || filterWithoutMedia || filterVegOnly) ? '#1D4ED8' : '#334155',
+                    fontSize: '12.5px',
+                    fontWeight: 700,
+                    cursor: 'pointer'
+                  }}
+                >
+                  <span>☰ Filters</span>
+                  <span style={{ fontSize: '9px' }}>▼</span>
+                </button>
+
+                {showFilterDropdown && (
+                  <div
+                    style={{
+                      position: 'absolute',
+                      top: 'calc(100% + 6px)',
+                      right: 0,
+                      width: '230px',
+                      backgroundColor: '#FFFFFF',
+                      borderRadius: '12px',
+                      boxShadow: '0 8px 24px rgba(0,0,0,0.15)',
+                      border: '1px solid #E2E8F0',
+                      padding: '12px',
+                      zIndex: 200,
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '8px'
+                    }}
+                  >
+                    <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '13px', cursor: 'pointer', padding: '4px 6px', borderRadius: '6px' }}>
+                      <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <input
+                          type="checkbox"
+                          checked={filterOutOfStock}
+                          onChange={e => setFilterOutOfStock(e.target.checked)}
+                        />
+                        <span>Out of stock</span>
+                      </span>
+                      <span style={{ fontSize: '11px', color: '#DC2626', fontWeight: 800 }}>({outOfStockCount})</span>
+                    </label>
+
+                    <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '13px', cursor: 'pointer', padding: '4px 6px', borderRadius: '6px' }}>
+                      <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <input
+                          type="checkbox"
+                          checked={filterInStock}
+                          onChange={e => setFilterInStock(e.target.checked)}
+                        />
+                        <span>In stock</span>
+                      </span>
+                      <span style={{ fontSize: '11px', color: '#16A34A', fontWeight: 800 }}>({inStockCount})</span>
+                    </label>
+
+                    <div style={{ height: '1px', backgroundColor: '#F1F5F9', margin: '2px 0' }} />
+
+                    <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '13px', cursor: 'pointer', padding: '4px 6px', borderRadius: '6px' }}>
+                      <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <input
+                          type="checkbox"
+                          checked={filterWithMedia}
+                          onChange={e => setFilterWithMedia(e.target.checked)}
+                        />
+                        <span>With media (Photo)</span>
+                      </span>
+                      <span style={{ fontSize: '11px', color: '#64748B', fontWeight: 700 }}>({withMediaCount})</span>
+                    </label>
+
+                    <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '13px', cursor: 'pointer', padding: '4px 6px', borderRadius: '6px' }}>
+                      <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <input
+                          type="checkbox"
+                          checked={filterWithoutMedia}
+                          onChange={e => setFilterWithoutMedia(e.target.checked)}
+                        />
+                        <span>Without media</span>
+                      </span>
+                      <span style={{ fontSize: '11px', color: '#94A3B8', fontWeight: 700 }}>({withoutMediaCount})</span>
+                    </label>
+
+                    <div style={{ height: '1px', backgroundColor: '#F1F5F9', margin: '2px 0' }} />
+
+                    <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '13px', cursor: 'pointer', padding: '4px 6px', borderRadius: '6px' }}>
+                      <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <input
+                          type="checkbox"
+                          checked={filterVegOnly}
+                          onChange={e => setFilterVegOnly(e.target.checked)}
+                        />
+                        <span>Pure Veg</span>
+                      </span>
+                      <span style={{ fontSize: '11px', color: '#16A34A', fontWeight: 700 }}>({vegCount})</span>
+                    </label>
+
+                    {(filterInStock || filterOutOfStock || filterWithMedia || filterWithoutMedia || filterVegOnly) && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setFilterInStock(false);
+                          setFilterOutOfStock(false);
+                          setFilterWithMedia(false);
+                          setFilterWithoutMedia(false);
+                          setFilterVegOnly(false);
+                        }}
+                        style={{
+                          marginTop: '6px',
+                          padding: '6px',
+                          background: '#F1F5F9',
+                          border: 'none',
+                          borderRadius: '6px',
+                          fontSize: '11.5px',
+                          fontWeight: 700,
+                          color: '#64748B',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        Clear All Filters
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* View Toggle */}
+              <div style={{ display: 'flex', gap: '2px', backgroundColor: '#F1F5F9', padding: '2px', borderRadius: '8px', border: '1px solid #E2E8F0' }}>
+                <button
+                  type="button"
+                  onClick={() => setViewMode('cards')}
+                  style={{
+                    padding: '5px 10px',
+                    borderRadius: '6px',
+                    border: 'none',
+                    fontSize: '11.5px',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    backgroundColor: viewMode === 'cards' ? '#FFFFFF' : 'transparent',
+                    color: viewMode === 'cards' ? '#0F172A' : '#64748B',
+                    boxShadow: viewMode === 'cards' ? '0 1px 3px rgba(0,0,0,0.08)' : 'none'
+                  }}
+                >
+                  ⊞ Cards
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setViewMode('list')}
+                  style={{
+                    padding: '5px 10px',
+                    borderRadius: '6px',
+                    border: 'none',
+                    fontSize: '11.5px',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    backgroundColor: viewMode === 'list' ? '#FFFFFF' : 'transparent',
+                    color: viewMode === 'list' ? '#0F172A' : '#64748B',
+                    boxShadow: viewMode === 'list' ? '0 1px 3px rgba(0,0,0,0.08)' : 'none'
+                  }}
+                >
+                  ☰ List
+                </button>
+              </div>
+            </div>
+          </div>
 
       {/* Items Container */}
       <div
@@ -1102,6 +1297,8 @@ export default function AdminMenuPage() {
             </table>
           </div>
         )}
+      </div>
+        </div>
       </div>
 
       {/* ========================================================================= */}

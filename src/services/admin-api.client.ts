@@ -33,11 +33,13 @@ export interface AdminOrderDto {
   order_type: string;
   customer_name?: string;
   customer_phone?: string;
+  customer_email?: string;
   delivery_address?: string;
   special_instructions?: string;
   subtotal: number;
   tax_amount: number;
   discount_amount: number;
+  additional_charges?: number;
   grand_total: number;
   status: string;
   payment_status: string;

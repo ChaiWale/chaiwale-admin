@@ -19,6 +19,22 @@ export default function AdminShell({ children }: AdminShellProps) {
 
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
+  const [isStoreOnline, setIsStoreOnline] = useState<boolean>(true);
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('cw_store_online');
+      if (saved !== null) setIsStoreOnline(saved === 'true');
+    } catch {}
+  }, []);
+
+  const toggleStoreStatus = () => {
+    const next = !isStoreOnline;
+    setIsStoreOnline(next);
+    try {
+      localStorage.setItem('cw_store_online', String(next));
+    } catch {}
+  };
 
   useEffect(() => {
     setMobileDrawerOpen(false);
@@ -108,16 +124,16 @@ export default function AdminShell({ children }: AdminShellProps) {
   const isOrdersStaff = currentUser?.email?.toLowerCase().includes('orders@');
 
   const navItems = isOrdersStaff
-    ? [{ label: 'Menu Management', href: '/menu', icon: '🍲' }]
+    ? [{ label: 'Menu Management', href: '/menu', icon: '📋' }]
     : [
+        { label: 'Orders', href: '/orders', icon: '🛎️' },
+        { label: 'Menu', href: '/menu', icon: '📋' },
         { label: 'Dashboard', href: '/', icon: '📊' },
-        { label: 'Clients & Khata PINs', href: '/clients', icon: '👥' },
         { label: 'Invoices', href: '/invoices', icon: '🧾' },
         { label: 'Customer Ledgers', href: '/ledger', icon: '📑' },
-        { label: 'Statements & Sales', href: '/statements', icon: '📈' },
-        { label: 'Live Orders', href: '/orders', icon: '📦' },
-        { label: 'Menu Management', href: '/menu', icon: '🍲' },
-        { label: 'Catering Leads', href: '/catering', icon: '📋' },
+        { label: 'Sales & Statements', href: '/statements', icon: '📈' },
+        { label: 'Clients & Khata', href: '/clients', icon: '👥' },
+        { label: 'Catering Leads', href: '/catering', icon: '🎪' },
         { label: 'Staff Attendance', href: '/attendance', icon: '📅' },
         { label: 'Settings', href: '/settings', icon: '⚙️' }
       ];
@@ -128,7 +144,7 @@ export default function AdminShell({ children }: AdminShellProps) {
     if (path.startsWith('/invoices')) return 'Invoices & Billing History';
     if (path.startsWith('/ledger')) return 'Customer & Corporate Ledgers';
     if (path.startsWith('/statements')) return 'Sales Statements & Registers';
-    if (path.startsWith('/orders')) return 'Live Orders & Status';
+    if (path.startsWith('/orders')) return 'Orders Manager';
     if (path.startsWith('/menu')) return 'Menu Catalog & Availability';
     if (path.startsWith('/catering')) return 'Catering Inquiries & Pipeline';
     if (path.startsWith('/attendance')) return 'Staff Attendance Roster';
@@ -137,53 +153,55 @@ export default function AdminShell({ children }: AdminShellProps) {
   };
 
   return (
-    <div style={{ display: 'flex', minHeight: '100vh', width: '100%', backgroundColor: '#F4F6F8' }}>
-      {/* Left Dark Sidebar (Desktop stationary) */}
+    <div style={{ display: 'flex', minHeight: '100vh', width: '100%', backgroundColor: '#F8FAFC' }}>
+      {/* Left Clean White Sidebar (Zomato Partner Style) */}
       <aside
         className="admin-sidebar-desktop"
         style={{
-          width: '240px',
-          backgroundColor: '#1E2328',
-          color: '#CBD5E1',
+          width: '230px',
+          backgroundColor: '#FFFFFF',
+          color: '#334155',
           display: 'flex',
           flexDirection: 'column',
           flexShrink: 0,
-          borderRight: '1px solid #2D3748'
+          borderRight: '1px solid #E2E8F0'
         }}
       >
         {/* Logo & Brand Header */}
         <div
           style={{
-            padding: '18px 20px',
+            padding: '16px 20px',
             display: 'flex',
             alignItems: 'center',
             gap: '12px',
-            borderBottom: '1px solid #2D3748'
+            borderBottom: '1px solid #F1F5F9'
           }}
         >
           <img
             src="/assets/chaiwale-logo.jpeg"
-            alt="Admin Logo"
-            style={{ height: '36px', width: '36px', borderRadius: '6px', objectFit: 'cover' }}
+            alt="Chaiwale"
+            style={{ height: '36px', width: '36px', borderRadius: '8px', objectFit: 'cover' }}
           />
           <div>
             <strong
               style={{
-                fontFamily: 'var(--cw-font-heading)',
-                color: '#FFFFFF',
-                fontSize: '18px',
+                color: '#0F172A',
+                fontSize: '17px',
                 fontWeight: 800,
-                letterSpacing: '0.04em',
+                letterSpacing: '-0.01em',
                 display: 'block'
               }}
             >
-              Admin
+              Chaiwale
             </strong>
+            <span style={{ fontSize: '11px', color: '#64748B', fontWeight: 600 }}>
+              Admin Dashboard
+            </span>
           </div>
         </div>
 
         {/* Navigation Links */}
-        <nav style={{ padding: '14px 10px', display: 'flex', flexDirection: 'column', gap: '4px', flex: 1 }}>
+        <nav style={{ padding: '12px 10px', display: 'flex', flexDirection: 'column', gap: '3px', flex: 1 }}>
           {navItems.map((item, idx) => {
             const isActive = item.href === '/' ? pathname === '/' : pathname.startsWith(item.href);
             return (
@@ -194,13 +212,12 @@ export default function AdminShell({ children }: AdminShellProps) {
                   display: 'flex',
                   alignItems: 'center',
                   gap: '10px',
-                  padding: '10px 14px',
-                  borderRadius: '6px',
+                  padding: '9px 12px',
+                  borderRadius: '8px',
                   fontSize: '13px',
-                  fontWeight: 600,
-                  color: isActive ? '#FFFFFF' : '#94A3B8',
-                  backgroundColor: isActive ? '#2D3748' : 'transparent',
-                  borderLeft: isActive ? '3px solid var(--cw-color-accent)' : '3px solid transparent',
+                  fontWeight: isActive ? 700 : 500,
+                  color: isActive ? '#0F172A' : '#475569',
+                  backgroundColor: isActive ? '#F1F5F9' : 'transparent',
                   textDecoration: 'none',
                   transition: 'all 0.15s ease'
                 }}
@@ -211,7 +228,6 @@ export default function AdminShell({ children }: AdminShellProps) {
             );
           })}
         </nav>
-
       </aside>
 
       {/* Mobile Off-Canvas Drawer */}
@@ -248,26 +264,27 @@ export default function AdminShell({ children }: AdminShellProps) {
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
-                borderBottom: '1px solid #2D3748'
+                borderBottom: '1px solid #F1F5F9'
               }}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                 <img
                   src="/assets/chaiwale-logo.jpeg"
-                  alt="Admin Logo"
+                  alt="Chaiwale"
                   style={{ height: '32px', width: '32px', borderRadius: '6px', objectFit: 'cover' }}
                 />
-                <strong style={{ color: '#FFFFFF', fontSize: '16px', fontWeight: 800 }}>Admin</strong>
+                <strong style={{ color: '#0F172A', fontSize: '16px', fontWeight: 800 }}>Chaiwale</strong>
               </div>
               <button
+                type="button"
                 onClick={() => setMobileDrawerOpen(false)}
-                style={{ background: 'none', border: 'none', color: '#94A3B8', fontSize: '18px', cursor: 'pointer' }}
+                style={{ background: 'none', border: 'none', color: '#64748B', fontSize: '18px', cursor: 'pointer' }}
               >
                 ✕
               </button>
             </div>
 
-            <nav style={{ padding: '14px 10px', display: 'flex', flexDirection: 'column', gap: '4px', flex: 1, overflowY: 'auto' }}>
+            <nav style={{ padding: '12px 10px', display: 'flex', flexDirection: 'column', gap: '3px', flex: 1, overflowY: 'auto' }}>
               {navItems.map((item, idx) => {
                 const isActive = item.href === '/' ? pathname === '/' : pathname.startsWith(item.href);
                 return (
@@ -280,11 +297,11 @@ export default function AdminShell({ children }: AdminShellProps) {
                       alignItems: 'center',
                       gap: '10px',
                       padding: '10px 14px',
-                      borderRadius: '6px',
+                      borderRadius: '8px',
                       fontSize: '13px',
-                      fontWeight: 600,
-                      color: isActive ? '#FFFFFF' : '#94A3B8',
-                      backgroundColor: isActive ? '#2D3748' : 'transparent',
+                      fontWeight: isActive ? 700 : 500,
+                      color: isActive ? '#0F172A' : '#475569',
+                      backgroundColor: isActive ? '#F1F5F9' : 'transparent',
                       textDecoration: 'none'
                     }}
                   >
@@ -300,20 +317,20 @@ export default function AdminShell({ children }: AdminShellProps) {
 
       {/* Main Dashboard Canvas */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
-        {/* Top Operational Bar */}
+        {/* Top Operational Bar (Zomato Partner Style) */}
         <header
           style={{
             height: '60px',
             backgroundColor: '#FFFFFF',
-            borderBottom: '1px solid var(--cw-color-border)',
+            borderBottom: '1px solid #E2E8F0',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
             padding: '0 20px',
-            boxShadow: '0 1px 2px rgba(0,0,0,0.03)'
+            boxShadow: '0 1px 3px rgba(0,0,0,0.02)'
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             <button
               type="button"
               className="admin-mobile-menu-btn"
@@ -333,17 +350,37 @@ export default function AdminShell({ children }: AdminShellProps) {
             </button>
             <span
               className="admin-header-title"
-              style={{ fontSize: '18px', fontWeight: 700, fontFamily: 'var(--cw-font-heading)', color: '#1E293B' }}
+              style={{ fontSize: '17px', fontWeight: 800, color: '#0F172A' }}
             >
               {getPageTitle(pathname)}
             </span>
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '14px', fontSize: '13px' }}>
-            <span style={{ color: 'var(--cw-color-success)', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-              <span style={{ width: '8px', height: '8px', backgroundColor: '#10B981', borderRadius: '50%', display: 'inline-block' }} />
-              Live
-            </span>
+            {/* Zomato Store Online / Offline Toggle Pill */}
+            <button
+              type="button"
+              onClick={toggleStoreStatus}
+              title={isStoreOnline ? 'Outlet is Online (Accepting Orders). Click to switch to Offline.' : 'Outlet is Offline (Paused). Click to switch to Online.'}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '6px 14px',
+                borderRadius: '20px',
+                fontSize: '12px',
+                fontWeight: 700,
+                cursor: 'pointer',
+                border: `1.5px solid ${isStoreOnline ? '#16A34A' : '#DC2626'}`,
+                backgroundColor: isStoreOnline ? '#F0FDF4' : '#FEF2F2',
+                color: isStoreOnline ? '#15803D' : '#B91C1C',
+                transition: 'all 0.15s ease'
+              }}
+            >
+              <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: isStoreOnline ? '#16A34A' : '#DC2626' }} />
+              {isStoreOnline ? 'Online ▾' : 'Offline ▾'}
+            </button>
+
             <AdminHeaderUser />
           </div>
         </header>

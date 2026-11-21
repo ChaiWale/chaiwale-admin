@@ -38,6 +38,9 @@ export default function AdminOrdersPage() {
   const [verifyUpiOrder, setVerifyUpiOrder] = useState<AdminOrderDto | null>(null);
   const [verifyUpiUtr, setVerifyUpiUtr] = useState<string>('');
 
+  // Order Details & Kitchen Preparation Modal
+  const [detailsModalOrder, setDetailsModalOrder] = useState<AdminOrderDto | null>(null);
+
   // Thermal Receipt Modal
   const [receiptModalOpen, setReceiptModalOpen] = useState(false);
   const [receiptModalData, setReceiptModalData] = useState<ThermalReceiptData | null>(null);
@@ -659,12 +662,22 @@ export default function AdminOrdersPage() {
             color: '#64748B'
           }}
         >
-          <span style={{ fontSize: '40px', display: 'block', marginBottom: '10px' }}>📦</span>
-          <p style={{ fontSize: '16px', fontWeight: 700, color: '#1E2328' }}>No Orders Found</p>
-          <p style={{ fontSize: '13px', marginTop: '4px' }}>
+          <div style={{ fontSize: '54px', marginBottom: '12px' }}>
+            {statusFilter === 'KITCHEN' ? '👨‍🍳' : statusFilter === 'READY' ? '🥡' : statusFilter === 'OUT_FOR_DELIVERY' ? '🛵' : '🍽️'}
+          </div>
+          <p style={{ fontSize: '18px', fontWeight: 800, color: '#0F172A', margin: '0 0 6px 0' }}>
+            {statusFilter === 'KITCHEN'
+              ? 'Orders being prepared in your kitchen'
+              : statusFilter === 'READY'
+              ? 'No food waiting for pickup right now'
+              : statusFilter === 'PENDING'
+              ? 'All orders confirmed! Kitchen is up to date'
+              : 'No orders found in this stage'}
+          </p>
+          <p style={{ fontSize: '13px', color: '#64748B', maxWidth: '420px', margin: '0 auto 16px auto', lineHeight: 1.5 }}>
             {searchQuery || statusFilter !== 'ALL' || dateFilter !== 'all'
-              ? 'No orders match your active date filter, status, or search query.'
-              : 'Orders placed from the website storefront or POS counter will appear here in real-time.'}
+              ? 'No live orders match your active filter. Check other pipeline tabs or reset filters.'
+              : 'New orders placed from the website or POS stream directly here with audio alerts.'}
           </p>
           {(searchQuery || statusFilter !== 'ALL' || dateFilter !== 'all') && (
             <button
@@ -946,11 +959,34 @@ export default function AdminOrdersPage() {
 
                 {/* Items Summary Snapshot */}
                 <div style={{ padding: '0 16px 10px', flex: 1 }}>
-                  <div style={{ fontSize: '11px', fontWeight: 800, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '6px' }}>
-                    Items Snapshot ({order.items?.length || 0})
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                    <span style={{ fontSize: '11px', fontWeight: 800, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                      Items Snapshot ({order.items?.length || 0})
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setDetailsModalOrder(order)}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        color: '#2563EB',
+                        fontSize: '11.5px',
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                        padding: '2px 4px',
+                        textDecoration: 'underline'
+                      }}
+                      title="View full item & variant preparation details"
+                    >
+                      👁️ View Details
+                    </button>
                   </div>
 
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                  <div
+                    onClick={() => setDetailsModalOrder(order)}
+                    style={{ display: 'flex', flexDirection: 'column', gap: '5px', cursor: 'pointer' }}
+                    title="Click to open order details modal"
+                  >
                     {order.items && order.items.length > 0 ? (
                       order.items.map((item, idx) => (
                         <div
@@ -967,6 +1003,11 @@ export default function AdminOrdersPage() {
                           <span style={{ color: '#1E2328' }}>
                             <strong style={{ color: '#6F432A', marginRight: '6px', fontSize: '13.5px' }}>{item.quantity}x</strong>
                             {item.item_name}
+                            {item.unit_price ? (
+                              <span style={{ fontSize: '11px', color: '#64748B', marginLeft: '6px' }}>
+                                (@ ₹{Number(item.unit_price).toFixed(2)})
+                              </span>
+                            ) : null}
                           </span>
                           <span style={{ fontWeight: 700, color: '#334155', fontSize: '12.5px' }}>
                             ₹{Number(item.line_total || item.unit_price * item.quantity).toFixed(2)}
@@ -1807,6 +1848,416 @@ export default function AdminOrdersPage() {
               >
                 ✓ Confirm & Mark PAID
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ================= MODAL: ORDER DETAILS & KITCHEN PREPARATION BREAKDOWN ================= */}
+      {detailsModalOrder && (
+        <div
+          onClick={() => setDetailsModalOrder(null)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.65)',
+            backdropFilter: 'blur(3px)',
+            zIndex: 1000,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '16px'
+          }}
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{
+              backgroundColor: '#FFFFFF',
+              borderRadius: '16px',
+              maxWidth: '680px',
+              width: '100%',
+              maxHeight: '90vh',
+              overflowY: 'auto',
+              boxShadow: '0 20px 50px rgba(0,0,0,0.3)',
+              display: 'flex',
+              flexDirection: 'column'
+            }}
+          >
+            {/* Header */}
+            <div
+              style={{
+                padding: '18px 24px',
+                borderBottom: '1px solid #E2E8F0',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                backgroundColor: '#F8FAFC'
+              }}
+            >
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                  <h2 style={{ fontSize: '18px', fontWeight: 800, color: '#0F172A', margin: 0 }}>
+                    Order #{detailsModalOrder.order_number}
+                  </h2>
+                  <span
+                    style={{
+                      padding: '3px 10px',
+                      borderRadius: '12px',
+                      fontSize: '11.5px',
+                      fontWeight: 800,
+                      backgroundColor: getStatusBadge(detailsModalOrder.status).bg,
+                      color: getStatusBadge(detailsModalOrder.status).color,
+                      border: `1px solid ${getStatusBadge(detailsModalOrder.status).border}`
+                    }}
+                  >
+                    {getStatusBadge(detailsModalOrder.status).label}
+                  </span>
+                  <span
+                    style={{
+                      padding: '3px 8px',
+                      borderRadius: '6px',
+                      fontSize: '11px',
+                      fontWeight: 700,
+                      backgroundColor: '#FEF3C7',
+                      color: '#92400E'
+                    }}
+                  >
+                    {detailsModalOrder.order_type}
+                  </span>
+                </div>
+                <p style={{ fontSize: '12px', color: '#64748B', margin: '4px 0 0 0' }}>
+                  Placed: {new Date(detailsModalOrder.created_at).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setDetailsModalOrder(null)}
+                style={{
+                  background: '#F1F5F9',
+                  border: 'none',
+                  borderRadius: '50%',
+                  width: '32px',
+                  height: '32px',
+                  fontSize: '16px',
+                  color: '#64748B',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div style={{ padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: '18px' }}>
+              
+              {/* Customer & Delivery Box */}
+              <div
+                style={{
+                  backgroundColor: '#F8FAFC',
+                  borderRadius: '12px',
+                  padding: '14px 16px',
+                  border: '1px solid #E2E8F0',
+                  fontSize: '13px'
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px', marginBottom: '8px' }}>
+                  <div style={{ fontWeight: 800, fontSize: '15px', color: '#0F172A' }}>
+                    👤 {detailsModalOrder.customer_name || 'Walk-in Guest'}
+                  </div>
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    {detailsModalOrder.customer_phone && (
+                      <a
+                        href={`tel:${detailsModalOrder.customer_phone}`}
+                        style={{
+                          padding: '4px 10px',
+                          borderRadius: '6px',
+                          backgroundColor: '#EFF6FF',
+                          border: '1px solid #BFDBFE',
+                          color: '#1D4ED8',
+                          fontWeight: 700,
+                          fontSize: '12px',
+                          textDecoration: 'none'
+                        }}
+                      >
+                        📞 Call Customer
+                      </a>
+                    )}
+                    {detailsModalOrder.customer_phone && (
+                      <a
+                        href={`https://wa.me/91${detailsModalOrder.customer_phone.replace(/\D/g, '').slice(-10)}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={{
+                          padding: '4px 10px',
+                          borderRadius: '6px',
+                          backgroundColor: '#DCFCE7',
+                          border: '1px solid #BBF7D0',
+                          color: '#166534',
+                          fontWeight: 700,
+                          fontSize: '12px',
+                          textDecoration: 'none'
+                        }}
+                      >
+                        💬 WhatsApp
+                      </a>
+                    )}
+                  </div>
+                </div>
+
+                {detailsModalOrder.customer_phone && (
+                  <div style={{ color: '#475569', marginBottom: '4px' }}>
+                    <strong>Phone:</strong> {detailsModalOrder.customer_phone}
+                  </div>
+                )}
+                {detailsModalOrder.customer_email && (
+                  <div style={{ color: '#475569', marginBottom: '4px' }}>
+                    <strong>Email:</strong> {detailsModalOrder.customer_email}
+                  </div>
+                )}
+                {detailsModalOrder.delivery_address && (
+                  <div style={{ color: '#334155', marginTop: '6px' }}>
+                    📍 <strong>Delivery Address:</strong> {detailsModalOrder.delivery_address}
+                  </div>
+                )}
+
+                {/* Special Instructions */}
+                {detailsModalOrder.special_instructions && (
+                  <div
+                    style={{
+                      marginTop: '10px',
+                      padding: '8px 12px',
+                      backgroundColor: '#FFFBEB',
+                      border: '1px solid #FCD34D',
+                      borderRadius: '8px',
+                      color: '#92400E',
+                      fontSize: '12px',
+                      fontWeight: 600
+                    }}
+                  >
+                    ⚠️ <strong>Special Instructions / Customer Notes:</strong>
+                    <div style={{ marginTop: '2px', fontWeight: 500 }}>{detailsModalOrder.special_instructions}</div>
+                  </div>
+                )}
+              </div>
+
+              {/* Kitchen Dish & Variant Preparation Table */}
+              <div>
+                <div style={{ fontSize: '13px', fontWeight: 800, color: '#0F172A', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <span>🍲</span> Kitchen Preparation & Item Breakdown ({detailsModalOrder.items?.length || 0} items)
+                </div>
+
+                <div style={{ border: '1px solid #E2E8F0', borderRadius: '12px', overflow: 'hidden' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px', textAlign: 'left' }}>
+                    <thead>
+                      <tr style={{ backgroundColor: '#F1F5F9', borderBottom: '1px solid #E2E8F0' }}>
+                        <th style={{ padding: '10px 14px', fontWeight: 700, color: '#475569' }}>Dish & Variant</th>
+                        <th style={{ padding: '10px 14px', fontWeight: 700, color: '#475569', textAlign: 'center' }}>Qty to Cook</th>
+                        <th style={{ padding: '10px 14px', fontWeight: 700, color: '#475569', textAlign: 'right' }}>Portion Price</th>
+                        <th style={{ padding: '10px 14px', fontWeight: 700, color: '#475569', textAlign: 'right' }}>Total</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(detailsModalOrder.items || []).map((item, idx) => {
+                        const matchVariant = item.item_name.match(/^(.*?)\s*\((.*?)\)$/);
+                        const dishBaseName = matchVariant ? matchVariant[1] : item.item_name;
+                        const variantName = matchVariant ? matchVariant[2] : null;
+
+                        return (
+                          <tr
+                            key={idx}
+                            style={{
+                              borderBottom: idx < detailsModalOrder.items!.length - 1 ? '1px solid #F1F5F9' : 'none',
+                              backgroundColor: idx % 2 === 0 ? '#FFFFFF' : '#FAFAFA'
+                            }}
+                          >
+                            <td style={{ padding: '12px 14px' }}>
+                              <div style={{ fontWeight: 700, color: '#0F172A', fontSize: '13.5px' }}>
+                                {dishBaseName}
+                              </div>
+                              {variantName && (
+                                <span
+                                  style={{
+                                    display: 'inline-block',
+                                    marginTop: '4px',
+                                    padding: '2px 8px',
+                                    borderRadius: '6px',
+                                    fontSize: '11px',
+                                    fontWeight: 700,
+                                    backgroundColor: '#FEF3C7',
+                                    color: '#B45309',
+                                    border: '1px solid #FDE68A'
+                                  }}
+                                >
+                                  🏷️ Variant: {variantName}
+                                </span>
+                              )}
+                            </td>
+                            <td style={{ padding: '12px 14px', textAlign: 'center' }}>
+                              <span
+                                style={{
+                                  display: 'inline-block',
+                                  padding: '4px 10px',
+                                  borderRadius: '6px',
+                                  backgroundColor: '#FAF5EE',
+                                  color: '#6F432A',
+                                  fontWeight: 800,
+                                  fontSize: '13px',
+                                  border: '1px solid #E5D5C5'
+                                }}
+                              >
+                                {item.quantity}x
+                              </span>
+                            </td>
+                            <td style={{ padding: '12px 14px', textAlign: 'right', color: '#475569', fontWeight: 600 }}>
+                              ₹{Number(item.unit_price || 0).toFixed(2)}
+                            </td>
+                            <td style={{ padding: '12px 14px', textAlign: 'right', fontWeight: 800, color: '#0F172A' }}>
+                              ₹{Number(item.line_total || (Number(item.unit_price || 0) * item.quantity)).toFixed(2)}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Financial Calculation Strip */}
+              <div
+                style={{
+                  backgroundColor: '#F8FAFC',
+                  borderRadius: '12px',
+                  padding: '14px 18px',
+                  border: '1px solid #E2E8F0',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  flexWrap: 'wrap',
+                  gap: '12px'
+                }}
+              >
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', fontSize: '12px', color: '#64748B' }}>
+                  <div>Subtotal: <strong>₹{Number(detailsModalOrder.subtotal || 0).toFixed(2)}</strong></div>
+                  <div>Tax / GST: <strong>₹{Number(detailsModalOrder.tax_amount || 0).toFixed(2)}</strong></div>
+                  {Number(detailsModalOrder.discount_amount || 0) > 0 && (
+                    <div style={{ color: '#16A34A' }}>Discount: -₹{Number(detailsModalOrder.discount_amount).toFixed(2)}</div>
+                  )}
+                  {Number(detailsModalOrder.additional_charges || 0) > 0 && (
+                    <div>Delivery / Addl: +₹{Number(detailsModalOrder.additional_charges).toFixed(2)}</div>
+                  )}
+                </div>
+
+                <div style={{ textAlign: 'right' }}>
+                  <div style={{ fontSize: '11px', color: '#64748B', fontWeight: 700, textTransform: 'uppercase' }}>Grand Total</div>
+                  <div style={{ fontSize: '22px', fontWeight: 900, color: '#0F172A' }}>
+                    ₹{Number(detailsModalOrder.grand_total).toFixed(2)}
+                  </div>
+                  <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end', marginTop: '4px' }}>
+                    <span
+                      style={{
+                        padding: '2px 8px',
+                        borderRadius: '4px',
+                        fontSize: '11px',
+                        fontWeight: 800,
+                        backgroundColor: detailsModalOrder.payment_mode === 'UPI' ? '#E0F2FE' : '#DCFCE7',
+                        color: detailsModalOrder.payment_mode === 'UPI' ? '#0284C7' : '#166534'
+                      }}
+                    >
+                      {detailsModalOrder.payment_mode === 'UPI' ? '📱 UPI' : '💵 CASH'}
+                    </span>
+                    <span
+                      style={{
+                        padding: '2px 8px',
+                        borderRadius: '4px',
+                        fontSize: '11px',
+                        fontWeight: 800,
+                        backgroundColor: detailsModalOrder.payment_status === 'PAID' ? '#DCFCE7' : '#FEF3C7',
+                        color: detailsModalOrder.payment_status === 'PAID' ? '#16A34A' : '#D97706'
+                      }}
+                    >
+                      {detailsModalOrder.payment_status}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Actions Footer */}
+            <div
+              style={{
+                padding: '16px 24px',
+                borderTop: '1px solid #E2E8F0',
+                backgroundColor: '#F8FAFC',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                flexWrap: 'wrap',
+                gap: '10px'
+              }}
+            >
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button
+                  type="button"
+                  onClick={() => handleOpenReceiptModal(detailsModalOrder, 'KOT')}
+                  style={{
+                    padding: '8px 14px',
+                    borderRadius: '8px',
+                    border: '1px solid #CBD5E1',
+                    backgroundColor: '#FFFFFF',
+                    color: '#0F172A',
+                    fontWeight: 700,
+                    fontSize: '12.5px',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px'
+                  }}
+                >
+                  🖨️ Print KOT
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleOpenReceiptModal(detailsModalOrder, 'CUSTOMER_BILL')}
+                  style={{
+                    padding: '8px 14px',
+                    borderRadius: '8px',
+                    border: '1px solid #CBD5E1',
+                    backgroundColor: '#FFFFFF',
+                    color: '#0F172A',
+                    fontWeight: 700,
+                    fontSize: '12.5px',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px'
+                  }}
+                >
+                  🧾 Print Bill
+                </button>
+              </div>
+
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button
+                  type="button"
+                  onClick={() => setDetailsModalOrder(null)}
+                  style={{
+                    padding: '8px 16px',
+                    borderRadius: '8px',
+                    border: '1px solid #CBD5E1',
+                    backgroundColor: '#FFFFFF',
+                    color: '#64748B',
+                    fontWeight: 700,
+                    fontSize: '12.5px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Close
+                </button>
+              </div>
             </div>
           </div>
         </div>
